@@ -6,8 +6,9 @@ const els = {
   loginHint: document.getElementById('loginHint'),
   loginPanel: document.getElementById('loginPanel'),
   dashboardPanel: document.getElementById('dashboardPanel'),
-  statusText: document.getElementById('statusText'),
   accountInfo: document.getElementById('accountInfo'),
+  payBtn: document.getElementById('payBtn'),
+  payHint: document.getElementById('payHint'),
   logoutBtn: document.getElementById('logoutBtn'),
   startDate: document.getElementById('startDate'),
   endDate: document.getElementById('endDate'),
@@ -78,10 +79,21 @@ function setAccountInfo(me) {
   const access = me.access_until || 'нет';
   const remaining = me.daily_runs_remaining ?? 0;
   els.accountInfo.textContent = `Доступ до: ${access} | Запусков осталось сегодня: ${remaining}`;
+
+  if (!me.access_until) {
+    els.payBtn.classList.remove('hidden');
+  } else {
+    const accessDate = Date.parse(me.access_until);
+    if (Number.isNaN(accessDate) || accessDate < Date.now()) {
+      els.payBtn.classList.remove('hidden');
+    } else {
+      els.payBtn.classList.add('hidden');
+    }
+  }
 }
 
 async function init() {
-  const greeting = 'Привет! Меня зовут Алёша, я кибер-стажёр. Помогу тебе с рутиной.';
+  const greeting = 'Quaerendo invenietis. Ища, найдёте.';
   if (els.introText && els.introCursor && !els.introText.dataset.typed) {
     let i = 0;
     els.introText.textContent = '';
@@ -262,6 +274,25 @@ els.runBtn.addEventListener('click', async () => {
   } finally {
     els.runBtn.disabled = false;
     els.runBtn.textContent = 'Запуск';
+  }
+});
+
+els.payBtn.addEventListener('click', async () => {
+  els.payHint.textContent = '';
+  try {
+    const res = await apiFetch('/billing/create_checkout_session', { method: 'POST' });
+    if (res.status !== 200) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Ошибка оплаты');
+    }
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    throw new Error('Не удалось получить ссылку оплаты');
+  } catch (e) {
+    els.payHint.textContent = e.message;
   }
 });
 

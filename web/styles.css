@@ -2,11 +2,11 @@
   --bg: #02030a;
   --panel: #0c2042;
   --accent: #244f80;
-  --text: #d6e6ff;
-  --muted: #9bb6d6;
+  --text: rgba(214, 230, 255, 0.9);
+  --muted: rgba(155, 182, 214, 0.9);
   --border: #244f80;
   --error: #ff6b8a;
-  --ok: #d6e6ff;
+  --ok: rgba(214, 230, 255, 0.9);
 }
 
 * {
@@ -33,7 +33,7 @@ body {
 .bg-image {
   position: fixed;
   inset: 0;
-  background-image: url("bg.jpg");
+  background-image: url("BG2.jpg");
   background-size: cover;
   background-position: center;
   filter: saturate(0.8) contrast(1.1);
@@ -43,7 +43,7 @@ body {
 
 .terminal {
   width: min(980px, 100%);
-  background: var(--bg);
+  background: rgba(2, 3, 10, 0.6);
   border: 1px solid var(--border);
   padding: 20px;
   position: relative;
@@ -51,44 +51,9 @@ body {
   backdrop-filter: blur(6px);
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 10px;
-  margin-bottom: 16px;
-}
-
-.brand__name {
-  letter-spacing: 2px;
-  font-size: 18px;
-}
-
-.brand__sub {
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.menu {
-  display: flex;
-  gap: 18px;
-  font-size: 12px;
-}
-
-.menu__item {
-  color: var(--muted);
-  text-decoration: none;
-  letter-spacing: 1px;
-}
-
-.menu__item:hover {
-  color: var(--text);
-}
-
 .hero {
   border: 1px solid var(--border);
-  background: rgba(2, 3, 10, 0.7);
+  background: rgba(12, 32, 66, 0.6);
   padding: 22px;
   margin-bottom: 16px;
   position: relative;
@@ -99,16 +64,9 @@ body {
   justify-content: center;
 }
 
-.hero__dot {
-  width: 6px;
-  height: 6px;
-  background: var(--text);
-  border-radius: 50%;
-}
-
 .hero__title {
-  font-size: 26px;
-  letter-spacing: 2px;
+  font-size: 36px;
+  letter-spacing: 4px;
 }
 
 .hero__subtitle {
@@ -120,7 +78,7 @@ body {
   border: 1px solid var(--border);
   padding: 16px;
   margin-bottom: 16px;
-  background: var(--panel);
+  background: rgba(12, 32, 66, 0.6);
 }
 
 .panel__head {
@@ -148,7 +106,7 @@ label {
 }
 
 input, textarea {
-  background: var(--bg);
+  background: rgba(2, 3, 10, 0.6);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 10px;
@@ -178,7 +136,7 @@ textarea {
 }
 
 button {
-  background: var(--accent);
+  background: rgba(36, 79, 128, 0.9);
   color: var(--text);
   border: none;
   padding: 10px 18px;
@@ -208,14 +166,14 @@ button:hover {
   width: 100%;
   text-align: left;
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: rgba(12, 32, 66, 0.6);
   color: var(--muted);
   box-shadow: none;
   margin-bottom: 12px;
 }
 
 .toggle-btn.is-active {
-  background: var(--accent);
+  background: rgba(36, 79, 128, 0.9);
   color: var(--text);
 }
 
@@ -255,18 +213,10 @@ pre {
   display: none;
 }
 
-.intro {
-  margin-bottom: 16px;
-  padding: 12px;
-  border: 1px dashed var(--border);
-  background: var(--panel);
-}
-
 .intro__text {
   display: inline;
-  font-size: 32px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-size: 16px;
+  letter-spacing: 0.5px;
 }
 
 .intro__cursor {
