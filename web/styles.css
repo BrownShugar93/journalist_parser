@@ -367,3 +367,11 @@ pre {
     grid-template-columns: 1fr;
   }
 }
+.modal a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.modal a:hover {
+  text-decoration: underline;
+}
