@@ -106,7 +106,7 @@ async function init() {
         els.introText.dataset.typed = '1';
         els.introCursor.classList.remove('hidden');
       }
-    }, 28);
+    }, 56);
   }
 
   const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';

@@ -42,7 +42,7 @@ body {
 }
 
 .terminal {
-  width: min(980px, 100%);
+  width: min(760px, 100%);
   background: rgba(2, 3, 10, 0.5);
   border: 1px solid var(--border);
   padding: 20px;
