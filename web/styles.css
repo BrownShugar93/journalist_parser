@@ -1,12 +1,12 @@
 :root {
   --bg: #02030a;
   --panel: #0c2042;
-  --accent: #244f80;
-  --text: rgba(214, 230, 255, 0.9);
-  --muted: rgba(155, 182, 214, 0.9);
-  --border: #244f80;
+  --accent: #245C73;
+  --text: #E3F7FF;
+  --muted: #9BB6D6;
+  --border: #245C73;
   --error: #ff6b8a;
-  --ok: rgba(214, 230, 255, 0.9);
+  --ok: #E3F7FF;
 }
 
 * {
@@ -33,7 +33,7 @@ body {
 .bg-image {
   position: fixed;
   inset: 0;
-  background-image: url("BG2.jpg");
+  background-image: url("bg2.jpg");
   background-size: cover;
   background-position: center;
   filter: saturate(0.8) contrast(1.1);
@@ -43,7 +43,7 @@ body {
 
 .terminal {
   width: min(980px, 100%);
-  background: rgba(2, 3, 10, 0.6);
+  background: rgba(2, 3, 10, 0.5);
   border: 1px solid var(--border);
   padding: 20px;
   position: relative;
@@ -53,7 +53,7 @@ body {
 
 .hero {
   border: 1px solid var(--border);
-  background: rgba(12, 32, 66, 0.6);
+  background: rgba(36, 92, 115, 0.5);
   padding: 22px;
   margin-bottom: 16px;
   position: relative;
@@ -78,7 +78,7 @@ body {
   border: 1px solid var(--border);
   padding: 16px;
   margin-bottom: 16px;
-  background: rgba(12, 32, 66, 0.6);
+  background: rgba(36, 92, 115, 0.5);
 }
 
 .panel__head {
@@ -106,7 +106,7 @@ label {
 }
 
 input, textarea {
-  background: rgba(2, 3, 10, 0.6);
+  background: rgba(2, 3, 10, 0.5);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 10px;
@@ -136,7 +136,7 @@ textarea {
 }
 
 button {
-  background: rgba(36, 79, 128, 0.9);
+  background: var(--accent);
   color: var(--text);
   border: none;
   padding: 10px 18px;
@@ -166,14 +166,14 @@ button:hover {
   width: 100%;
   text-align: left;
   border: 1px solid var(--border);
-  background: rgba(12, 32, 66, 0.6);
+  background: rgba(36, 92, 115, 0.5);
   color: var(--muted);
   box-shadow: none;
   margin-bottom: 12px;
 }
 
 .toggle-btn.is-active {
-  background: rgba(36, 79, 128, 0.9);
+  background: var(--accent);
   color: var(--text);
 }
 
