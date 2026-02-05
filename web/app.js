@@ -23,6 +23,10 @@ const els = {
   downloadTxt: document.getElementById('downloadTxt'),
   introText: document.getElementById('introText'),
   introCursor: document.getElementById('introCursor'),
+  legalBtn: document.getElementById('legalBtn'),
+  legalModal: document.getElementById('legalModal'),
+  legalClose: document.getElementById('legalClose'),
+  legalCloseBtn: document.getElementById('legalCloseBtn'),
 };
 
 const store = {
@@ -295,5 +299,25 @@ els.payBtn.addEventListener('click', async () => {
     els.payHint.textContent = e.message;
   }
 });
+
+function openLegal() {
+  els.legalModal.classList.remove('hidden');
+  els.legalModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeLegal() {
+  els.legalModal.classList.add('hidden');
+  els.legalModal.setAttribute('aria-hidden', 'true');
+}
+
+if (els.legalBtn) {
+  els.legalBtn.addEventListener('click', openLegal);
+}
+if (els.legalClose) {
+  els.legalClose.addEventListener('click', closeLegal);
+}
+if (els.legalCloseBtn) {
+  els.legalCloseBtn.addEventListener('click', closeLegal);
+}
 
 init();

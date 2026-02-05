@@ -15,6 +15,10 @@
         <div class="hero__subtitle">
           <span id="introText" class="intro__text"></span><span id="introCursor" class="intro__cursor hidden">▍</span>
         </div>
+        <div class="hero__actions">
+          <a class="ghost-btn" href="mailto:Behal.inc@gmail.com">Поддержка</a>
+          <button id="legalBtn" class="ghost-btn" type="button">Реквизиты и условия</button>
+        </div>
       </section>
 
       <section class="panel" id="loginPanel">
@@ -90,6 +94,55 @@ https://t.me/rogozin_do</textarea>
 
       <footer class="footer">v0.1</footer>
     </main>
+
+    <div id="legalModal" class="modal hidden" aria-hidden="true">
+      <div class="modal__backdrop" id="legalClose"></div>
+      <div class="modal__panel">
+        <div class="modal__head">
+          <div class="modal__title">Реквизиты и условия</div>
+          <button id="legalCloseBtn" class="ghost-btn" type="button">Закрыть</button>
+        </div>
+        <div class="modal__body">
+          <div class="section__title">Тарифы</div>
+          <div class="prices">
+            <div class="price-card">
+              <div class="price-card__title">Сутки</div>
+              <div class="price-card__value">93 ₽</div>
+            </div>
+            <div class="price-card">
+              <div class="price-card__title">Месяц</div>
+              <div class="price-card__value">999 ₽</div>
+            </div>
+            <div class="price-card">
+              <div class="price-card__title">Год</div>
+              <div class="price-card__value">4777 ₽</div>
+            </div>
+          </div>
+
+          <div class="section__title">Реквизиты</div>
+          <div class="section__text">
+            Самозанятый: Забелин Глеб Сергеевич<br />
+            ИНН: 772035233003
+          </div>
+
+          <div class="section__title">Описание услуг</div>
+          <div class="section__text">
+            Предоставление онлайн‑доступа к сервису поиска публикаций в Telegram по ключевым словам.
+          </div>
+
+          <div class="section__title">Условия оказания услуг</div>
+          <div class="section__text">
+            Доступ предоставляется на выбранный срок после подтверждения оплаты. Услуга оказывается в электронном виде.
+          </div>
+
+          <div class="section__title">Возврат</div>
+          <div class="section__text">
+            По вопросам возврата и отказа от услуги, пожалуйста, пишите на
+            <a href="mailto:Behal.inc@gmail.com">Behal.inc@gmail.com</a>.
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script src="config.js"></script>
     <script src="app.js"></script>
