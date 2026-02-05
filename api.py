@@ -53,6 +53,8 @@ load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
 app = FastAPI(title="TG Video Parser API")
 
+APP_VERSION = "2026-02-06-free-access"
+
 origins = ["*"] if CORS_ORIGINS.strip() == "*" else [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -435,6 +437,11 @@ async def stripe_webhook(request: Request):
                 set_access_until(int(user["id"]), access_until)
 
     return {"ok": True}
+
+
+@app.get("/version")
+def version():
+    return {"version": APP_VERSION}
 
 
 @app.post("/admin/create_user")
