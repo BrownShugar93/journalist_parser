@@ -387,4 +387,17 @@ if (els.tariffsCloseBtn) {
   els.tariffsCloseBtn.addEventListener('click', closeTariffs);
 }
 
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (els.registerModal && !els.registerModal.classList.contains('hidden')) {
+    closeRegister();
+  }
+  if (els.legalModal && !els.legalModal.classList.contains('hidden')) {
+    closeLegal();
+  }
+  if (els.tariffsModal && !els.tariffsModal.classList.contains('hidden')) {
+    closeTariffs();
+  }
+});
+
 init();
