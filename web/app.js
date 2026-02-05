@@ -20,6 +20,8 @@ const els = {
   linksOutput: document.getElementById('linksOutput'),
   downloadCsv: document.getElementById('downloadCsv'),
   downloadTxt: document.getElementById('downloadTxt'),
+  introText: document.getElementById('introText'),
+  introCursor: document.getElementById('introCursor'),
 };
 
 const store = {
@@ -79,6 +81,22 @@ function setAccountInfo(me) {
 }
 
 async function init() {
+  const greeting = 'Привет! Меня зовут Алёша, я стажёр. Помогу тебе с рутиной.';
+  if (els.introText && els.introCursor && !els.introText.dataset.typed) {
+    let i = 0;
+    els.introText.textContent = '';
+    els.introCursor.classList.add('hidden');
+    const timer = setInterval(() => {
+      els.introText.textContent = greeting.slice(0, i + 1);
+      i += 1;
+      if (i >= greeting.length) {
+        clearInterval(timer);
+        els.introText.dataset.typed = '1';
+        els.introCursor.classList.remove('hidden');
+      }
+    }, 28);
+  }
+
   const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';
   store.apiUrl = apiUrl;
   els.startDate.value = todayISO();
