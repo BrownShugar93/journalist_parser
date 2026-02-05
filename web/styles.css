@@ -172,6 +172,22 @@ button:hover {
   margin-bottom: 12px;
 }
 
+.toggle-btn {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: #0b1a12;
+  color: #b2b2b2;
+  box-shadow: none;
+  margin-bottom: 12px;
+}
+
+.toggle-btn.is-active {
+  background: var(--text);
+  color: #020503;
+  box-shadow: 0 0 12px var(--glow);
+}
+
 .hint {
   font-size: 13px;
   color: var(--muted);

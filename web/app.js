@@ -1,5 +1,4 @@
 const els = {
-  apiUrl: document.getElementById('apiUrl'),
   email: document.getElementById('email'),
   password: document.getElementById('password'),
   loginBtn: document.getElementById('loginBtn'),
@@ -56,8 +55,8 @@ function txtBlob(links) {
 }
 
 async function apiFetch(path, options = {}) {
-  const apiUrl = els.apiUrl.value.trim();
-  if (!apiUrl) throw new Error('Укажи API URL');
+  const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';
+  if (!apiUrl) throw new Error('API URL не задан');
   const headers = options.headers || {};
   if (store.token) headers['Authorization'] = `Bearer ${store.token}`;
   if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
@@ -80,8 +79,8 @@ function setAccountInfo(me) {
 }
 
 async function init() {
-  const apiUrl = store.apiUrl || (window.API_URL || '').trim() || 'http://localhost:8000';
-  els.apiUrl.value = apiUrl;
+  const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';
+  store.apiUrl = apiUrl;
   els.startDate.value = todayISO();
   els.endDate.value = todayISO();
 
@@ -105,7 +104,6 @@ async function init() {
 
 els.loginBtn.addEventListener('click', async () => {
   els.loginHint.textContent = '';
-  store.apiUrl = els.apiUrl.value.trim();
 
   try {
     const res = await apiFetch('/auth/login', {
@@ -131,7 +129,6 @@ els.loginBtn.addEventListener('click', async () => {
 
 els.registerBtn.addEventListener('click', async () => {
   els.loginHint.textContent = '';
-  store.apiUrl = els.apiUrl.value.trim();
 
   try {
     const res = await apiFetch('/auth/register', {
@@ -163,6 +160,11 @@ els.logoutBtn.addEventListener('click', async () => {
   await init();
 });
 
+els.videosOnly.addEventListener('click', () => {
+  const isActive = els.videosOnly.classList.toggle('is-active');
+  els.videosOnly.dataset.active = isActive ? '1' : '0';
+});
+
 els.runBtn.addEventListener('click', async () => {
   els.runHint.textContent = '';
   els.results.classList.add('hidden');
@@ -191,7 +193,7 @@ els.runBtn.addEventListener('click', async () => {
     keywords,
     start_date: els.startDate.value,
     end_date: els.endDate.value,
-    videos_only: els.videosOnly.checked,
+    videos_only: els.videosOnly.classList.contains('is-active'),
   };
 
   els.runBtn.disabled = true;

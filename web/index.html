@@ -19,10 +19,6 @@
       <section class="panel" id="loginPanel">
         <h2>Вход</h2>
         <div class="field">
-          <label for="apiUrl">API URL</label>
-          <input id="apiUrl" type="text" placeholder="http://localhost:8000" />
-        </div>
-        <div class="field">
           <label for="email">Email</label>
           <input id="email" type="email" placeholder="user@example.com" />
         </div>
@@ -32,7 +28,7 @@
         </div>
         <div class="row">
           <button id="loginBtn">Войти</button>
-          <button id="registerBtn" class="ghost">Регистрация</button>
+          <button id="registerBtn" class="ghost">Зарегистрироваться</button>
           <div class="hint" id="loginHint"></div>
         </div>
         <div class="hint">Регистрация создаёт аккаунт без доступа. Доступ активируется после оплаты.</div>
@@ -68,10 +64,7 @@
 https://t.me/rogozin_do</textarea>
         </div>
 
-        <label class="checkbox">
-          <input id="videosOnly" type="checkbox" checked />
-          Искать только посты с видео
-        </label>
+        <button id="videosOnly" class="toggle-btn is-active" type="button">Искать только посты с видео</button>
 
         <div class="row">
           <button id="runBtn">Запуск</button>
