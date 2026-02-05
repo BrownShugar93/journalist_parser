@@ -3,6 +3,7 @@ const els = {
   email: document.getElementById('email'),
   password: document.getElementById('password'),
   loginBtn: document.getElementById('loginBtn'),
+  registerBtn: document.getElementById('registerBtn'),
   loginHint: document.getElementById('loginHint'),
   loginPanel: document.getElementById('loginPanel'),
   dashboardPanel: document.getElementById('dashboardPanel'),
@@ -118,6 +119,32 @@ els.loginBtn.addEventListener('click', async () => {
     if (res.status !== 200) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.detail || 'Ошибка входа');
+    }
+
+    const data = await res.json();
+    store.token = data.token;
+    await init();
+  } catch (e) {
+    els.loginHint.textContent = e.message;
+  }
+});
+
+els.registerBtn.addEventListener('click', async () => {
+  els.loginHint.textContent = '';
+  store.apiUrl = els.apiUrl.value.trim();
+
+  try {
+    const res = await apiFetch('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: els.email.value.trim(),
+        password: els.password.value,
+      }),
+    });
+
+    if (res.status !== 200) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Ошибка регистрации');
     }
 
     const data = await res.json();

@@ -69,6 +69,11 @@ class LoginResponse(BaseModel):
     access_until: Optional[str]
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
 class SearchRequest(BaseModel):
     channels: List[str]
     keywords: List[str]
@@ -281,6 +286,29 @@ def login(req: LoginRequest):
         token=token,
         expires_at=expires_at.isoformat(),
         access_until=user["access_until"],
+    )
+
+
+@app.post("/auth/register", response_model=LoginResponse)
+def register(req: RegisterRequest):
+    if not req.email or not req.password:
+        raise HTTPException(status_code=400, detail="Email и пароль обязательны")
+    existing = get_user_by_email(req.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Пользователь уже существует")
+
+    salt = generate_salt()
+    password_hash = hash_password(req.password, salt)
+    try:
+        user_id = create_user(req.email, password_hash, salt)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Пользователь уже существует")
+
+    token, expires_at = create_session_token(int(user_id))
+    return LoginResponse(
+        token=token,
+        expires_at=expires_at.isoformat(),
+        access_until=None,
     )
 
 
