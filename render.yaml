@@ -16,7 +16,7 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
-  - type: static
+  - type: static_site
     name: tg-parser-web
     env: static
     plan: free
