@@ -225,9 +225,30 @@ pre {
 }
 
 .footer {
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--muted);
   font-size: 12px;
+}
+
+.footer__links {
+  display: flex;
+  gap: 14px;
+}
+
+.footer__link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.footer__link:hover {
+  color: var(--text);
 }
 
 .modal {

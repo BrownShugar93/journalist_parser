@@ -27,6 +27,10 @@ const els = {
   legalModal: document.getElementById('legalModal'),
   legalClose: document.getElementById('legalClose'),
   legalCloseBtn: document.getElementById('legalCloseBtn'),
+  tariffsBtn: document.getElementById('tariffsBtn'),
+  tariffsModal: document.getElementById('tariffsModal'),
+  tariffsClose: document.getElementById('tariffsClose'),
+  tariffsCloseBtn: document.getElementById('tariffsCloseBtn'),
 };
 
 const store = {
@@ -318,6 +322,26 @@ if (els.legalClose) {
 }
 if (els.legalCloseBtn) {
   els.legalCloseBtn.addEventListener('click', closeLegal);
+}
+
+function openTariffs() {
+  els.tariffsModal.classList.remove('hidden');
+  els.tariffsModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeTariffs() {
+  els.tariffsModal.classList.add('hidden');
+  els.tariffsModal.setAttribute('aria-hidden', 'true');
+}
+
+if (els.tariffsBtn) {
+  els.tariffsBtn.addEventListener('click', openTariffs);
+}
+if (els.tariffsClose) {
+  els.tariffsClose.addEventListener('click', closeTariffs);
+}
+if (els.tariffsCloseBtn) {
+  els.tariffsCloseBtn.addEventListener('click', closeTariffs);
 }
 
 init();
