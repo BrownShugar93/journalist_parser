@@ -31,6 +31,14 @@ const els = {
   tariffsModal: document.getElementById('tariffsModal'),
   tariffsClose: document.getElementById('tariffsClose'),
   tariffsCloseBtn: document.getElementById('tariffsCloseBtn'),
+  registerModal: document.getElementById('registerModal'),
+  registerClose: document.getElementById('registerClose'),
+  registerCloseBtn: document.getElementById('registerCloseBtn'),
+  regEmail: document.getElementById('regEmail'),
+  regPassword: document.getElementById('regPassword'),
+  regPassword2: document.getElementById('regPassword2'),
+  registerSubmit: document.getElementById('registerSubmit'),
+  registerHint: document.getElementById('registerHint'),
 };
 
 const store = {
@@ -41,7 +49,9 @@ const store = {
 };
 
 function setStatus(text) {
-  els.statusText.textContent = text;
+  if (els.statusText) {
+    els.statusText.textContent = text;
+  }
 }
 
 function show(el) { el.classList.remove('hidden'); }
@@ -165,30 +175,63 @@ els.loginBtn.addEventListener('click', async () => {
   }
 });
 
-els.registerBtn.addEventListener('click', async () => {
-  els.loginHint.textContent = '';
+function openRegister() {
+  els.registerModal.classList.remove('hidden');
+  els.registerModal.setAttribute('aria-hidden', 'false');
+  if (els.registerHint) els.registerHint.textContent = '';
+}
 
-  try {
-    const res = await apiFetch('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: els.email.value.trim(),
-        password: els.password.value,
-      }),
-    });
+function closeRegister() {
+  els.registerModal.classList.add('hidden');
+  els.registerModal.setAttribute('aria-hidden', 'true');
+}
 
-    if (res.status !== 200) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.detail || 'Ошибка регистрации');
+if (els.registerBtn) {
+  els.registerBtn.addEventListener('click', openRegister);
+}
+if (els.registerClose) {
+  els.registerClose.addEventListener('click', closeRegister);
+}
+if (els.registerCloseBtn) {
+  els.registerCloseBtn.addEventListener('click', closeRegister);
+}
+
+if (els.registerSubmit) {
+  els.registerSubmit.addEventListener('click', async () => {
+    if (els.registerHint) els.registerHint.textContent = '';
+    const email = (els.regEmail.value || '').trim();
+    const p1 = els.regPassword.value || '';
+    const p2 = els.regPassword2.value || '';
+
+    if (!email || !p1 || !p2) {
+      els.registerHint.textContent = 'Заполни все поля.';
+      return;
+    }
+    if (p1 !== p2) {
+      els.registerHint.textContent = 'Пароли не совпадают.';
+      return;
     }
 
-    const data = await res.json();
-    store.token = data.token;
-    await init();
-  } catch (e) {
-    els.loginHint.textContent = e.message;
-  }
-});
+    try {
+      const res = await apiFetch('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password: p1 }),
+      });
+
+      if (res.status !== 200) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Ошибка регистрации');
+      }
+
+      const data = await res.json();
+      store.token = data.token;
+      closeRegister();
+      await init();
+    } catch (e) {
+      els.registerHint.textContent = e.message;
+    }
+  });
+}
 
 els.logoutBtn.addEventListener('click', async () => {
   try {

@@ -156,6 +156,35 @@ https://t.me/rogozin_do</textarea>
       </div>
     </div>
 
+    <div id="registerModal" class="modal hidden" aria-hidden="true">
+      <div class="modal__backdrop" id="registerClose"></div>
+      <div class="modal__panel">
+        <div class="modal__head">
+          <div class="modal__title">Регистрация</div>
+          <button id="registerCloseBtn" class="ghost-btn" type="button">Закрыть</button>
+        </div>
+        <div class="modal__body">
+          <div class="field">
+            <label for="regEmail">Email</label>
+            <input id="regEmail" type="email" placeholder="user@example.com" />
+          </div>
+          <div class="field">
+            <label for="regPassword">Пароль</label>
+            <input id="regPassword" type="password" placeholder="••••••••" />
+          </div>
+          <div class="field">
+            <label for="regPassword2">Повтор пароля</label>
+            <input id="regPassword2" type="password" placeholder="••••••••" />
+          </div>
+          <div class="row">
+            <button id="registerSubmit">Создать аккаунт</button>
+            <div class="hint" id="registerHint"></div>
+          </div>
+          <div class="hint">После регистрации доступ нужно активировать оплатой.</div>
+        </div>
+      </div>
+    </div>
+
     <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
