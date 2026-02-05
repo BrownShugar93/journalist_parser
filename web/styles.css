@@ -33,7 +33,7 @@ body {
 .bg-image {
   position: fixed;
   inset: 0;
-  background-image: url("bg2.jpg");
+  background-image: url("bg.jpg");
   background-size: cover;
   background-position: center;
   filter: saturate(0.8) contrast(1.1);
@@ -53,7 +53,7 @@ body {
 
 .hero {
   border: 1px solid var(--border);
-  background: rgba(36, 92, 115, 0.5);
+  background: rgba(49, 57, 64, 0.5);
   padding: 22px;
   margin-bottom: 16px;
   position: relative;
@@ -78,7 +78,7 @@ body {
   border: 1px solid var(--border);
   padding: 16px;
   margin-bottom: 16px;
-  background: rgba(36, 92, 115, 0.5);
+  background: rgba(49, 57, 64, 0.5);
 }
 
 .panel__head {
@@ -166,7 +166,7 @@ button:hover {
   width: 100%;
   text-align: left;
   border: 1px solid var(--border);
-  background: rgba(36, 92, 115, 0.5);
+  background: rgba(49, 57, 64, 0.5);
   color: var(--muted);
   box-shadow: none;
   margin-bottom: 12px;
