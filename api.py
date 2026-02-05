@@ -7,10 +7,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, HTTPException, Header, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
+import stripe
 from telethon.sessions import StringSession
 
 from db import (
@@ -43,6 +44,10 @@ SESSION_NAME = os.getenv("TG_SESSION_NAME", "tg_service_session")
 TG_STRING_SESSION = os.getenv("TG_STRING_SESSION", "").strip()
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "").strip()
+WEB_BASE_URL = os.getenv("WEB_BASE_URL", "").strip() or "http://localhost:5500"
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -56,6 +61,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
 
 
 class LoginRequest(BaseModel):
@@ -101,6 +109,10 @@ class AdminCreateUserRequest(BaseModel):
 class AdminGrantAccessRequest(BaseModel):
     email: str
     days: int = 1
+
+
+class CheckoutResponse(BaseModel):
+    url: str
 
 
 @app.on_event("startup")
@@ -273,6 +285,11 @@ def _require_admin(token_header: Optional[str]):
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
 
+def _require_stripe():
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        raise HTTPException(status_code=500, detail="Stripe не настроен")
+
+
 @app.post("/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest):
     user = get_user_by_email(req.email)
@@ -337,12 +354,7 @@ def me(authorization: Optional[str] = Header(default=None)):
 async def search(req: SearchRequest, authorization: Optional[str] = Header(default=None)):
     user = _get_user_from_token(authorization)
 
-    if not user["access_until"]:
-        raise HTTPException(status_code=402, detail="Доступ не активирован")
-
-    access_until = datetime.fromisoformat(user["access_until"])
-    if access_until < datetime.now(timezone.utc):
-        raise HTTPException(status_code=402, detail="Доступ истек")
+    # Access gating temporarily disabled by request.
 
     channels = _normalize_channels(req.channels)
     keywords = _normalize_keywords(req.keywords)
@@ -381,6 +393,48 @@ async def search(req: SearchRequest, authorization: Optional[str] = Header(defau
     update_daily_runs(int(user["id"]), today_str, daily_count + 1)
 
     return SearchResponse(links=links_only, rows=rows)
+
+
+@app.post("/billing/create_checkout_session", response_model=CheckoutResponse)
+def create_checkout_session(authorization: Optional[str] = Header(default=None)):
+    _require_stripe()
+    user = _get_user_from_token(authorization)
+    email = user["email"]
+    try:
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            customer_email=email,
+            success_url=f"{WEB_BASE_URL}/?checkout=success",
+            cancel_url=f"{WEB_BASE_URL}/?checkout=cancel",
+            metadata={"email": email, "access_days": "1"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {e}")
+    return CheckoutResponse(url=session.url)
+
+
+@app.post("/billing/stripe_webhook")
+async def stripe_webhook(request: Request):
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Stripe webhook secret не настроен")
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        email = session.get("customer_email") or session.get("metadata", {}).get("email")
+        if email:
+            user = get_user_by_email(email)
+            if user:
+                access_until = datetime.now(timezone.utc) + timedelta(days=1)
+                set_access_until(int(user["id"]), access_until)
+
+    return {"ok": True}
 
 
 @app.post("/admin/create_user")
