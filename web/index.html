@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TG Parser</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <div class="scanlines"></div>
+
+    <main class="terminal">
+      <header class="terminal__header">
+        <div class="logo">TG PARSER</div>
+        <div class="status" id="statusText">Подключение...</div>
+      </header>
+
+      <section class="panel" id="loginPanel">
+        <h2>Вход</h2>
+        <div class="field">
+          <label for="apiUrl">API URL</label>
+          <input id="apiUrl" type="text" placeholder="http://localhost:8000" />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="user@example.com" />
+        </div>
+        <div class="field">
+          <label for="password">Пароль</label>
+          <input id="password" type="password" placeholder="••••••••" />
+        </div>
+        <div class="row">
+          <button id="loginBtn">Войти</button>
+          <div class="hint" id="loginHint"></div>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="dashboardPanel">
+        <div class="panel__head">
+          <h2>Кабинет</h2>
+          <button id="logoutBtn" class="ghost">Выйти</button>
+        </div>
+
+        <div class="info" id="accountInfo"></div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="startDate">Дата начала</label>
+            <input id="startDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="endDate">Дата конца</label>
+            <input id="endDate" type="date" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="keywords">Ключевые слова (через запятую или построчно)</label>
+          <textarea id="keywords" rows="4">курьер</textarea>
+        </div>
+
+        <div class="field">
+          <label for="channels">Каналы (t.me/... или @username, по одному в строке)</label>
+          <textarea id="channels" rows="6">https://t.me/mod_russia
+https://t.me/rogozin_do</textarea>
+        </div>
+
+        <label class="checkbox">
+          <input id="videosOnly" type="checkbox" checked />
+          Искать только посты с видео
+        </label>
+
+        <div class="row">
+          <button id="runBtn">Запуск</button>
+          <div class="hint" id="runHint"></div>
+        </div>
+
+        <div class="results hidden" id="results">
+          <div class="panel__head">
+            <h3>Результаты</h3>
+            <div class="row">
+              <button id="downloadCsv" class="ghost">Скачать CSV</button>
+              <button id="downloadTxt" class="ghost">Скачать TXT</button>
+            </div>
+          </div>
+          <pre id="linksOutput"></pre>
+        </div>
+      </section>
+
+      <footer class="footer">v0.1</footer>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

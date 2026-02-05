@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: tg-parser-api
+    env: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: TG_API_ID
+        sync: false
+      - key: TG_API_HASH
+        sync: false
+      - key: TG_SESSION_NAME
+        value: tg_service_session
+      - key: CORS_ORIGINS
+        value: "*"
+
+  - type: static
+    name: tg-parser-web
+    env: static
+    plan: free
+    region: frankfurt
+    staticPublishPath: web
+    buildCommand: ""
