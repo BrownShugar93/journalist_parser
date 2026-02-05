@@ -15,11 +15,3 @@ services:
         value: tg_service_session
       - key: CORS_ORIGINS
         value: "*"
-
-  - type: static_site
-    name: tg-parser-web
-    env: static
-    plan: free
-    region: frankfurt
-    staticPublishPath: web
-    buildCommand: ""
