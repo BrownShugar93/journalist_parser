@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 from db import (
     init_db,
@@ -20,8 +21,10 @@ from db import (
     delete_session,
     reset_daily_runs_if_needed,
     update_daily_runs,
+    create_user,
+    set_access_until,
 )
-from auth import verify_password, create_session_token
+from auth import generate_salt, hash_password, verify_password, create_session_token
 
 CHANNEL_RE = re.compile(
     r"(?:https?://t\.me/(?:s/)?|@)?(?P<user>[A-Za-z0-9_]{4,})", re.IGNORECASE
@@ -37,7 +40,9 @@ THROTTLE_SECONDS = 0.05
 API_ID = os.getenv("TG_API_ID", "").strip()
 API_HASH = os.getenv("TG_API_HASH", "").strip()
 SESSION_NAME = os.getenv("TG_SESSION_NAME", "tg_service_session")
+TG_STRING_SESSION = os.getenv("TG_STRING_SESSION", "").strip()
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -81,6 +86,16 @@ class MeResponse(BaseModel):
     email: str
     access_until: Optional[str]
     daily_runs_remaining: int
+
+
+class AdminCreateUserRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AdminGrantAccessRequest(BaseModel):
+    email: str
+    days: int = 1
 
 
 @app.on_event("startup")
@@ -174,7 +189,9 @@ async def _search_videos_and_texts(
     found: Dict[str, Tuple[datetime, str, str, str]] = {}
     end_inclusive = end + timedelta(seconds=1)
 
-    async with TelegramClient(SESSION_NAME, int(API_ID), API_HASH) as client:
+    session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
+
+    async with TelegramClient(session, int(API_ID), API_HASH) as client:
         for ch in channels:
             try:
                 entity = await client.get_entity(ch)
@@ -210,7 +227,9 @@ async def _search_videos_and_texts(
     links_only = [link for _, _, _, link in final]
 
     rows: List[Tuple[str, str]] = []
-    async with TelegramClient(SESSION_NAME, int(API_ID), API_HASH) as client:
+    session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
+
+    async with TelegramClient(session, int(API_ID), API_HASH) as client:
         for link in links_only:
             try:
                 text = await _fetch_text_by_link(client, link)
@@ -240,6 +259,13 @@ def _get_user_from_token(auth_header: Optional[str]):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
     return user
+
+
+def _require_admin(token_header: Optional[str]):
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN не задан")
+    if not token_header or token_header.strip() != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
 
 
 @app.post("/auth/login", response_model=LoginResponse)
@@ -327,3 +353,30 @@ async def search(req: SearchRequest, authorization: Optional[str] = Header(defau
     update_daily_runs(int(user["id"]), today_str, daily_count + 1)
 
     return SearchResponse(links=links_only, rows=rows)
+
+
+@app.post("/admin/create_user")
+def admin_create_user(
+    req: AdminCreateUserRequest, x_admin_token: Optional[str] = Header(default=None)
+):
+    _require_admin(x_admin_token)
+    salt = generate_salt()
+    password_hash = hash_password(req.password, salt)
+    try:
+        user_id = create_user(req.email, password_hash, salt)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Пользователь уже существует")
+    return {"user_id": user_id}
+
+
+@app.post("/admin/grant_access")
+def admin_grant_access(
+    req: AdminGrantAccessRequest, x_admin_token: Optional[str] = Header(default=None)
+):
+    _require_admin(x_admin_token)
+    user = get_user_by_email(req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    access_until = datetime.now(timezone.utc) + timedelta(days=req.days)
+    set_access_until(int(user["id"]), access_until)
+    return {"ok": True, "access_until": access_until.isoformat()}
