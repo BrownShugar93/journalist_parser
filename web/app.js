@@ -81,7 +81,7 @@ function setAccountInfo(me) {
 }
 
 async function init() {
-  const greeting = 'Привет! Меня зовут Алёша, я стажёр. Помогу тебе с рутиной.';
+  const greeting = 'Привет! Меня зовут Алёша, я кибер-стажёр. Помогу тебе с рутиной.';
   if (els.introText && els.introCursor && !els.introText.dataset.typed) {
     let i = 0;
     els.introText.textContent = '';
