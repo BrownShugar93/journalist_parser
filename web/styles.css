@@ -203,6 +203,14 @@ textarea {
   gap: 12px;
 }
 
+.login-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0 6px;
+}
+
 button {
   background: var(--accent);
   color: var(--text);

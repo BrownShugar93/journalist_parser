@@ -1,8 +1,5 @@
 const els = {
-  email: document.getElementById('email'),
-  password: document.getElementById('password'),
   loginBtn: document.getElementById('loginBtn'),
-  registerBtn: document.getElementById('registerBtn'),
   loginHint: document.getElementById('loginHint'),
   loginPanel: document.getElementById('loginPanel'),
   dashboardPanel: document.getElementById('dashboardPanel'),
@@ -22,22 +19,6 @@ const els = {
   introText: document.getElementById('introText'),
   introCursor: document.getElementById('introCursor'),
   channelList: document.getElementById('channelList'),
-  legalBtn: document.getElementById('legalBtn'),
-  legalModal: document.getElementById('legalModal'),
-  legalClose: document.getElementById('legalClose'),
-  legalCloseBtn: document.getElementById('legalCloseBtn'),
-  tariffsBtn: document.getElementById('tariffsBtn'),
-  tariffsModal: document.getElementById('tariffsModal'),
-  tariffsClose: document.getElementById('tariffsClose'),
-  tariffsCloseBtn: document.getElementById('tariffsCloseBtn'),
-  registerModal: document.getElementById('registerModal'),
-  registerClose: document.getElementById('registerClose'),
-  registerCloseBtn: document.getElementById('registerCloseBtn'),
-  regEmail: document.getElementById('regEmail'),
-  regPassword: document.getElementById('regPassword'),
-  regPassword2: document.getElementById('regPassword2'),
-  registerSubmit: document.getElementById('registerSubmit'),
-  registerHint: document.getElementById('registerHint'),
 };
 
 const store = {
@@ -202,8 +183,8 @@ async function init() {
       show(els.resultsPanel);
       document.body.classList.add('is-auth');
       if (els.channelList) {
-        if (!els.channelList.value) els.channelList.value = 'voenkory';
-        if (!els.channels.value.trim()) {
+        if (!els.channelList.value) els.channelList.value = 'custom';
+        if (!els.channels.value.trim() && els.channelList.value !== 'custom') {
           applyChannelList(els.channelList.value);
         }
       }
@@ -224,14 +205,12 @@ async function init() {
 
 els.loginBtn.addEventListener('click', async () => {
   els.loginHint.textContent = '';
-
   try {
-    const res = await apiFetch('/auth/login', {
+    const email = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@vestigator.local`;
+    const password = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const res = await apiFetch('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({
-        email: els.email.value.trim(),
-        password: els.password.value,
-      }),
+      body: JSON.stringify({ email, password }),
     });
 
     if (res.status !== 200) {
@@ -247,64 +226,6 @@ els.loginBtn.addEventListener('click', async () => {
   }
 });
 
-function openRegister() {
-  els.registerModal.classList.remove('hidden');
-  els.registerModal.setAttribute('aria-hidden', 'false');
-  if (els.registerHint) els.registerHint.textContent = '';
-}
-
-function closeRegister() {
-  els.registerModal.classList.add('hidden');
-  els.registerModal.setAttribute('aria-hidden', 'true');
-}
-
-if (els.registerBtn) {
-  els.registerBtn.addEventListener('click', openRegister);
-}
-if (els.registerClose) {
-  els.registerClose.addEventListener('click', closeRegister);
-}
-if (els.registerCloseBtn) {
-  els.registerCloseBtn.addEventListener('click', closeRegister);
-}
-
-if (els.registerSubmit) {
-  els.registerSubmit.addEventListener('click', async () => {
-    if (els.registerHint) els.registerHint.textContent = '';
-    const email = (els.regEmail.value || '').trim();
-    const p1 = els.regPassword.value || '';
-    const p2 = els.regPassword2.value || '';
-
-    if (!email || !p1 || !p2) {
-      els.registerHint.textContent = 'Заполни все поля.';
-      return;
-    }
-    if (p1 !== p2) {
-      els.registerHint.textContent = 'Пароли не совпадают.';
-      return;
-    }
-
-    try {
-      const res = await apiFetch('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ email, password: p1 }),
-      });
-
-      if (res.status !== 200) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || 'Ошибка регистрации');
-      }
-
-      const data = await res.json();
-      store.token = data.token;
-      closeRegister();
-      await init();
-    } catch (e) {
-      els.registerHint.textContent = e.message;
-    }
-  });
-}
-
 els.logoutBtn.addEventListener('click', async () => {
   try {
     await apiFetch('/auth/logout', { method: 'POST' });
@@ -313,10 +234,10 @@ els.logoutBtn.addEventListener('click', async () => {
   await init();
 });
 
-els.videosOnly.addEventListener('click', () => {
-  const isActive = els.videosOnly.classList.toggle('is-active');
-  els.videosOnly.dataset.active = isActive ? '1' : '0';
-});
+  els.videosOnly.addEventListener('click', () => {
+    const isActive = els.videosOnly.classList.toggle('is-active');
+    els.videosOnly.dataset.active = isActive ? '1' : '0';
+  });
 
 if (els.channelList) {
   els.channelList.addEventListener('change', () => {
@@ -419,9 +340,6 @@ els.runBtn.addEventListener('click', async () => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (els.registerModal && !els.registerModal.classList.contains('hidden')) {
-    closeRegister();
-  }
 });
 
 init();
