@@ -43,6 +43,7 @@ SESSION_NAME = os.getenv("TG_SESSION_NAME", "tg_service_session")
 TG_STRING_SESSION = os.getenv("TG_STRING_SESSION", "").strip()
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
+AUTH_DISABLED = os.getenv("AUTH_DISABLED", "").strip().lower() in ("1", "true", "yes")
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -113,6 +114,18 @@ def on_startup():
     if not API_ID or not API_HASH:
         raise RuntimeError("TG_API_ID/TG_API_HASH are required")
     init_db()
+    if AUTH_DISABLED:
+        _ensure_guest_user()
+
+
+def _ensure_guest_user():
+    guest_email = "guest@vestigator.local"
+    user = get_user_by_email(guest_email)
+    if user:
+        return
+    salt = generate_salt()
+    password_hash = hash_password("guest", salt)
+    create_user(guest_email, password_hash, salt)
 
 
 def _parse_date(s: str) -> date:
@@ -253,6 +266,14 @@ async def _search_videos_and_texts(
 
 
 def _get_user_from_token(auth_header: Optional[str]):
+    if AUTH_DISABLED:
+        guest = get_user_by_email("guest@vestigator.local")
+        if guest:
+            return guest
+        _ensure_guest_user()
+        guest = get_user_by_email("guest@vestigator.local")
+        if guest:
+            return guest
     if not auth_header:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Нужна авторизация")
     if not auth_header.startswith("Bearer "):
@@ -380,7 +401,8 @@ async def search(req: SearchRequest, authorization: Optional[str] = Header(defau
         throttle=THROTTLE_SECONDS,
     )
 
-    update_daily_runs(int(user["id"]), today_str, daily_count + 1)
+    if links_only:
+        update_daily_runs(int(user["id"]), today_str, daily_count + 1)
 
     return SearchResponse(links=links_only, rows=rows)
 

@@ -28,6 +28,8 @@ const store = {
   set apiUrl(v) { if (v) localStorage.setItem('apiUrl', v); },
 };
 
+const GUEST_MODE = window.GUEST_MODE === true;
+
 function setStatus(text) {
   if (els.statusText) {
     els.statusText.textContent = text;
@@ -196,6 +198,15 @@ async function init() {
     }
   }
 
+  if (GUEST_MODE) {
+    hide(els.loginPanel);
+    show(els.dashboardPanel);
+    show(els.resultsPanel);
+    document.body.classList.add('is-auth');
+    els.accountInfo.textContent = 'Гостевой режим';
+    return;
+  }
+
   show(els.loginPanel);
   hide(els.dashboardPanel);
   hide(els.resultsPanel);
@@ -205,24 +216,13 @@ async function init() {
 
 els.loginBtn.addEventListener('click', async () => {
   els.loginHint.textContent = '';
-  try {
-    const email = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@vestigator.local`;
-    const password = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    const res = await apiFetch('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (res.status !== 200) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.detail || 'Ошибка входа');
-    }
-
-    const data = await res.json();
-    store.token = data.token;
-    await init();
-  } catch (e) {
-    els.loginHint.textContent = e.message;
+  if (GUEST_MODE) {
+    hide(els.loginPanel);
+    show(els.dashboardPanel);
+    show(els.resultsPanel);
+    document.body.classList.add('is-auth');
+    els.accountInfo.textContent = 'Гостевой режим';
+    return;
   }
 });
 
