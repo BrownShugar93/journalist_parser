@@ -10,24 +10,6 @@
     <div class="bg-image"></div>
 
     <main class="terminal">
-      <section class="panel" id="loginPanel">
-        <h2>Вход</h2>
-        <div class="field">
-          <label for="email">Email</label>
-          <input id="email" type="email" placeholder="user@example.com" />
-        </div>
-        <div class="field">
-          <label for="password">Пароль</label>
-          <input id="password" type="password" placeholder="••••••••" />
-        </div>
-        <div class="row">
-          <button id="loginBtn">Войти</button>
-          <button id="registerBtn" class="ghost">Зарегистрироваться</button>
-          <div class="hint" id="loginHint"></div>
-        </div>
-        <div class="hint">Ищет посты в Telegram по ключевым словам.</div>
-      </section>
-
       <div class="main-grid">
         <div class="left-stack">
           <section class="hero hero--compact">
@@ -35,6 +17,24 @@
             <div class="hero__subtitle">
               <span id="introText" class="intro__text"></span><span id="introCursor" class="intro__cursor hidden">▍</span>
             </div>
+          </section>
+
+          <section class="panel" id="loginPanel">
+            <h2>Вход</h2>
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" type="email" placeholder="user@example.com" />
+            </div>
+            <div class="field">
+              <label for="password">Пароль</label>
+              <input id="password" type="password" placeholder="••••••••" />
+            </div>
+            <div class="row">
+              <button id="loginBtn">Войти</button>
+              <button id="registerBtn" class="ghost">Зарегистрироваться</button>
+              <div class="hint" id="loginHint"></div>
+            </div>
+            <div class="hint">Ищет посты в Telegram по ключевым словам.</div>
           </section>
 
           <section class="panel hidden" id="dashboardPanel">

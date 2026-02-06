@@ -200,6 +200,7 @@ async function init() {
       hide(els.loginPanel);
       show(els.dashboardPanel);
       show(els.resultsPanel);
+      document.body.classList.add('is-auth');
       if (els.channelList) {
         if (!els.channelList.value) els.channelList.value = 'voenkory';
         if (!els.channels.value.trim()) {
@@ -217,6 +218,7 @@ async function init() {
   show(els.loginPanel);
   hide(els.dashboardPanel);
   hide(els.resultsPanel);
+  document.body.classList.remove('is-auth');
   setStatus('Ожидание входа');
 }
 
