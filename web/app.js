@@ -21,6 +21,7 @@ const els = {
   downloadTxt: document.getElementById('downloadTxt'),
   introText: document.getElementById('introText'),
   introCursor: document.getElementById('introCursor'),
+  channelList: document.getElementById('channelList'),
   legalBtn: document.getElementById('legalBtn'),
   legalModal: document.getElementById('legalModal'),
   legalClose: document.getElementById('legalClose'),
@@ -96,6 +97,81 @@ function setAccountInfo(me) {
   els.accountInfo.textContent = `Запусков осталось сегодня: ${remaining}`;
 }
 
+const channelLists = {
+  voenkory: [
+    'https://t.me/dontstopwar',
+    'https://t.me/mod_russia',
+    'https://t.me/rogozin_do',
+    'https://t.me/ramzayiegokomanda',
+    'https://t.me/warhistoryalconafter',
+    'https://t.me/epoddubny',
+    'https://t.me/svodkidpr180',
+    'https://t.me/orchestra_w',
+    'https://t.me/notes_veterans',
+    'https://t.me/rusich_army',
+    'https://t.me/zvezdanews',
+    'https://t.me/RVvoenkor',
+    'https://t.me/akashevarova',
+    'https://t.me/Sladkov_plus',
+    'https://t.me/ghost_of_novorossia',
+    'https://t.me/panteri_panteri',
+    'https://t.me/creamy_caprice',
+    'https://t.me/prolivstalina',
+    'https://t.me/z4lpr',
+    'https://t.me/Lunay14',
+    'https://t.me/ttambyl',
+    'https://t.me/UAVDEV',
+    'https://t.me/sudoplatov_official',
+    'https://t.me/vault8pro',
+    'https://t.me/MSP1307',
+    'https://t.me/tulaovod',
+    'https://t.me/russian_shock_volunteer_brigade',
+    'https://t.me/RUSSIARB',
+    'https://t.me/dronnitsa',
+    'https://t.me/song_infantry',
+    'https://t.me/voron_fpv',
+    'https://t.me/battalion106',
+    'https://t.me/video_s_svo',
+    'https://t.me/operationall_space',
+    'https://t.me/korobov_latyncev',
+    'https://t.me/voickokipchaka',
+    'https://t.me/heartlandfire',
+    'https://t.me/DKulko',
+    'https://t.me/ChDambiev',
+    'https://t.me/Warhronika',
+    'https://t.me/btr80',
+    'https://t.me/sashakots',
+  ],
+  news: [
+    'https://t.me/rian_ru',
+    'https://t.me/tass_agency',
+    'https://t.me/rbc_news',
+    'https://t.me/kommersant',
+    'https://t.me/izvestia',
+    'https://t.me/gazetaru',
+    'https://t.me/truekpru',
+    'https://t.me/vestiru24',
+    'https://t.me/ntvnews',
+    'https://t.me/rentv_news',
+    'https://t.me/rt_russian',
+    'https://t.me/lentadnya',
+    'https://t.me/meduzalive',
+    'https://t.me/mash',
+    'https://t.me/breakingmash',
+    'https://t.me/bazabazon',
+    'https://t.me/shot_shot',
+    'https://t.me/readovkanews',
+    'https://t.me/ostorozhno_novosti',
+    'https://t.me/dimsmirnov175',
+  ],
+  custom: [],
+};
+
+function applyChannelList(key) {
+  const list = channelLists[key] || [];
+  els.channels.value = list.join('\n');
+}
+
 async function init() {
   const greeting = 'Quaerendo invenietis. Ища, найдёте.';
   if (els.introText && els.introCursor && !els.introText.dataset.typed) {
@@ -124,6 +200,12 @@ async function init() {
       hide(els.loginPanel);
       show(els.dashboardPanel);
       show(els.resultsPanel);
+      if (els.channelList) {
+        if (!els.channelList.value) els.channelList.value = 'voenkory';
+        if (!els.channels.value.trim()) {
+          applyChannelList(els.channelList.value);
+        }
+      }
       setAccountInfo(me);
       setStatus('Онлайн');
       return;
@@ -233,6 +315,17 @@ els.videosOnly.addEventListener('click', () => {
   const isActive = els.videosOnly.classList.toggle('is-active');
   els.videosOnly.dataset.active = isActive ? '1' : '0';
 });
+
+if (els.channelList) {
+  els.channelList.addEventListener('change', () => {
+    const val = els.channelList.value;
+    if (val === 'custom') {
+      els.channels.value = '';
+      return;
+    }
+    applyChannelList(val);
+  });
+}
 
 els.runBtn.addEventListener('click', async () => {
   els.runHint.textContent = '';

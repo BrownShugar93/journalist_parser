@@ -140,6 +140,32 @@ textarea {
   resize: vertical;
 }
 
+.select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select-btn {
+  width: 100%;
+  appearance: none;
+  background: rgba(49, 57, 64, 0.5);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 34px 10px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: var(--text);
+  font-size: 14px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
