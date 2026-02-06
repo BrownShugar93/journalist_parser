@@ -15,7 +15,7 @@ const els = {
   videosOnly: document.getElementById('videosOnly'),
   runBtn: document.getElementById('runBtn'),
   runHint: document.getElementById('runHint'),
-  results: document.getElementById('results'),
+  resultsPanel: document.getElementById('resultsPanel'),
   linksOutput: document.getElementById('linksOutput'),
   downloadCsv: document.getElementById('downloadCsv'),
   downloadTxt: document.getElementById('downloadTxt'),
@@ -123,6 +123,7 @@ async function init() {
       const me = await loadMe();
       hide(els.loginPanel);
       show(els.dashboardPanel);
+      show(els.resultsPanel);
       setAccountInfo(me);
       setStatus('Онлайн');
       return;
@@ -133,6 +134,7 @@ async function init() {
 
   show(els.loginPanel);
   hide(els.dashboardPanel);
+  hide(els.resultsPanel);
   setStatus('Ожидание входа');
 }
 
@@ -234,7 +236,6 @@ els.videosOnly.addEventListener('click', () => {
 
 els.runBtn.addEventListener('click', async () => {
   els.runHint.textContent = '';
-  els.results.classList.add('hidden');
   els.linksOutput.textContent = '';
 
   const keywords = els.keywords.value
@@ -281,8 +282,7 @@ els.runBtn.addEventListener('click', async () => {
     const links = data.links || [];
     const rows = data.rows || [];
 
-    els.linksOutput.textContent = links.join('\n');
-    els.results.classList.remove('hidden');
+    els.linksOutput.textContent = links.length ? links.join('\n') : 'Пока пусто.';
 
     els.downloadCsv.onclick = () => {
       const blob = csvBlob(rows);

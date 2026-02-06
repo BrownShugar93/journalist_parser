@@ -32,29 +32,28 @@
           <button id="registerBtn" class="ghost">Зарегистрироваться</button>
           <div class="hint" id="loginHint"></div>
         </div>
-        <div class="hint">Регистрация создаёт аккаунт без доступа. Доступ активируется после оплаты.</div>
       </section>
 
-      <section class="panel hidden" id="dashboardPanel">
-        <div class="panel__head">
-          <h2>Кабинет</h2>
-          <button id="logoutBtn" class="ghost">Выйти</button>
-        </div>
-
-        <div class="info" id="accountInfo"></div>
-
-        <div class="grid">
-          <div class="field">
-            <label for="startDate">Дата начала</label>
-            <input id="startDate" type="date" />
+      <div class="main-grid">
+        <section class="panel hidden" id="dashboardPanel">
+          <div class="panel__head">
+            <h2>Кабинет</h2>
+            <button id="logoutBtn" class="ghost">Выйти</button>
           </div>
-          <div class="field">
-            <label for="endDate">Дата конца</label>
-            <input id="endDate" type="date" />
-          </div>
-        </div>
 
-        <div class="dashboard-grid">
+          <div class="info" id="accountInfo"></div>
+
+          <div class="grid">
+            <div class="field">
+              <label for="startDate">Дата начала</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="endDate">Дата конца</label>
+              <input id="endDate" type="date" />
+            </div>
+          </div>
+
           <div class="dashboard-left">
             <div class="field">
               <label for="keywords">Ключевые слова (через запятую или построчно)</label>
@@ -74,21 +73,19 @@ https://t.me/rogozin_do</textarea>
               <div class="hint" id="runHint"></div>
             </div>
           </div>
+        </section>
 
-          <div class="dashboard-right">
-            <div class="results hidden" id="results">
-              <div class="panel__head">
-                <h3>Результаты</h3>
-                <div class="row">
-                  <button id="downloadCsv" class="ghost">Скачать CSV</button>
-                  <button id="downloadTxt" class="ghost">Скачать TXT</button>
-                </div>
-              </div>
-              <pre id="linksOutput"></pre>
+        <section class="panel results-panel hidden" id="resultsPanel">
+          <div class="panel__head">
+            <h3>Результаты</h3>
+            <div class="row">
+              <button id="downloadCsv" class="ghost">Скачать CSV</button>
+              <button id="downloadTxt" class="ghost">Скачать TXT</button>
             </div>
           </div>
-        </div>
-      </section>
+          <pre id="linksOutput">Пока пусто.</pre>
+        </section>
+      </div>
 
       <footer class="footer">
         <span class="footer__version">v0.1</span>
@@ -123,7 +120,6 @@ https://t.me/rogozin_do</textarea>
             <button id="registerSubmit">Создать аккаунт</button>
             <div class="hint" id="registerHint"></div>
           </div>
-          <div class="hint">После регистрации доступ нужно активировать оплатой.</div>
         </div>
       </div>
     </div>

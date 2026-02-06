@@ -94,15 +94,15 @@ body {
   margin-bottom: 10px;
 }
 
-.dashboard-grid {
+.main-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 16px;
   align-items: start;
 }
 
-.dashboard-right .results {
-  display: block;
+.results-panel pre {
+  min-height: 320px;
 }
 
 h2, h3 {
@@ -289,7 +289,7 @@ pre {
   .grid {
     grid-template-columns: 1fr;
   }
-  .dashboard-grid {
+  .main-grid {
     grid-template-columns: 1fr;
   }
   .row {
