@@ -327,6 +327,14 @@ if (els.channelList) {
   });
 }
 
+if (els.channels && els.channelList) {
+  els.channels.addEventListener('input', () => {
+    if (els.channelList.value !== 'custom') {
+      els.channelList.value = 'custom';
+    }
+  });
+}
+
 els.runBtn.addEventListener('click', async () => {
   els.runHint.textContent = '';
   els.linksOutput.textContent = '';
