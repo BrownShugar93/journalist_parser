@@ -10,13 +10,6 @@
     <div class="bg-image"></div>
 
     <main class="terminal">
-      <section class="hero">
-        <div class="hero__title">VESTIGATOR.</div>
-        <div class="hero__subtitle">
-          <span id="introText" class="intro__text"></span><span id="introCursor" class="intro__cursor hidden">▍</span>
-        </div>
-      </section>
-
       <section class="panel" id="loginPanel">
         <h2>Вход</h2>
         <div class="field">
@@ -36,11 +29,19 @@
       </section>
 
       <div class="main-grid">
-        <section class="panel hidden" id="dashboardPanel">
-          <div class="panel__head">
-            <h2>Кабинет</h2>
-            <button id="logoutBtn" class="ghost">Выйти</button>
-          </div>
+        <div class="left-stack">
+          <section class="hero hero--compact">
+            <div class="hero__title">VESTIGATOR.</div>
+            <div class="hero__subtitle">
+              <span id="introText" class="intro__text"></span><span id="introCursor" class="intro__cursor hidden">▍</span>
+            </div>
+          </section>
+
+          <section class="panel hidden" id="dashboardPanel">
+            <div class="panel__head">
+              <h2>Кабинет</h2>
+              <button id="logoutBtn" class="ghost">Выйти</button>
+            </div>
 
           <div class="info" id="accountInfo"></div>
 
@@ -55,37 +56,38 @@
             </div>
           </div>
 
-          <div class="dashboard-left">
-            <div class="field">
-              <label for="channelList">Списки каналов</label>
-              <div class="select-wrap">
-                <select id="channelList" class="select-btn">
-                  <option value="voenkory">Военкоры</option>
-                  <option value="news">Новости</option>
-                  <option value="custom">Свой вариант</option>
-                </select>
-                <span class="select-arrow">▾</span>
+            <div class="dashboard-left">
+              <div class="field">
+                <label for="channelList">Списки каналов</label>
+                <div class="select-wrap">
+                  <select id="channelList" class="select-btn">
+                    <option value="voenkory">Военкоры</option>
+                    <option value="news">Новости</option>
+                    <option value="custom">Свой вариант</option>
+                  </select>
+                  <span class="select-arrow">▾</span>
+                </div>
+              </div>
+              <div class="field">
+                <label for="keywords">Ключевые слова (через запятую или построчно)</label>
+                <textarea id="keywords" rows="4">курьер</textarea>
+              </div>
+
+              <div class="field">
+                <label for="channels">Каналы (t.me/... или @username, по одному в строке)</label>
+                <textarea id="channels" rows="6">https://t.me/mod_russia
+https://t.me/rogozin_do</textarea>
+              </div>
+
+              <button id="videosOnly" class="toggle-btn is-active" type="button">Искать только посты с видео</button>
+
+              <div class="row">
+                <button id="runBtn">Запуск</button>
+                <div class="hint" id="runHint"></div>
               </div>
             </div>
-            <div class="field">
-              <label for="keywords">Ключевые слова (через запятую или построчно)</label>
-              <textarea id="keywords" rows="4">курьер</textarea>
-            </div>
-
-            <div class="field">
-              <label for="channels">Каналы (t.me/... или @username, по одному в строке)</label>
-              <textarea id="channels" rows="6">https://t.me/mod_russia
-https://t.me/rogozin_do</textarea>
-            </div>
-
-            <button id="videosOnly" class="toggle-btn is-active" type="button">Искать только посты с видео</button>
-
-            <div class="row">
-              <button id="runBtn">Запуск</button>
-              <div class="hint" id="runHint"></div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section class="panel results-panel hidden" id="resultsPanel">
           <div class="panel__head">

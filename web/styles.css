@@ -98,9 +98,30 @@ body {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
+.left-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero--compact {
+  margin-bottom: 0;
+}
+
+.results-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.results-panel pre {
+  min-height: 420px;
+  max-height: 520px;
+  flex: 1;
+}
 .results-panel pre {
   min-height: 320px;
 }
