@@ -7,8 +7,6 @@ const els = {
   loginPanel: document.getElementById('loginPanel'),
   dashboardPanel: document.getElementById('dashboardPanel'),
   accountInfo: document.getElementById('accountInfo'),
-  payBtn: document.getElementById('payBtn'),
-  payHint: document.getElementById('payHint'),
   logoutBtn: document.getElementById('logoutBtn'),
   startDate: document.getElementById('startDate'),
   endDate: document.getElementById('endDate'),
@@ -94,20 +92,8 @@ async function loadMe() {
 }
 
 function setAccountInfo(me) {
-  const access = me.access_until || 'нет';
   const remaining = me.daily_runs_remaining ?? 0;
-  els.accountInfo.textContent = `Доступ до: ${access} | Запусков осталось сегодня: ${remaining}`;
-
-  if (!me.access_until) {
-    els.payBtn.classList.remove('hidden');
-  } else {
-    const accessDate = Date.parse(me.access_until);
-    if (Number.isNaN(accessDate) || accessDate < Date.now()) {
-      els.payBtn.classList.remove('hidden');
-    } else {
-      els.payBtn.classList.add('hidden');
-    }
-  }
+  els.accountInfo.textContent = `Запусков осталось сегодня: ${remaining}`;
 }
 
 async function init() {
@@ -328,75 +314,10 @@ els.runBtn.addEventListener('click', async () => {
   }
 });
 
-els.payBtn.addEventListener('click', async () => {
-  els.payHint.textContent = '';
-  try {
-    const res = await apiFetch('/billing/create_checkout_session', { method: 'POST' });
-    if (res.status !== 200) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.detail || 'Ошибка оплаты');
-    }
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-      return;
-    }
-    throw new Error('Не удалось получить ссылку оплаты');
-  } catch (e) {
-    els.payHint.textContent = e.message;
-  }
-});
-
-function openLegal() {
-  els.legalModal.classList.remove('hidden');
-  els.legalModal.setAttribute('aria-hidden', 'false');
-}
-
-function closeLegal() {
-  els.legalModal.classList.add('hidden');
-  els.legalModal.setAttribute('aria-hidden', 'true');
-}
-
-if (els.legalBtn) {
-  els.legalBtn.addEventListener('click', openLegal);
-}
-if (els.legalClose) {
-  els.legalClose.addEventListener('click', closeLegal);
-}
-if (els.legalCloseBtn) {
-  els.legalCloseBtn.addEventListener('click', closeLegal);
-}
-
-function openTariffs() {
-  els.tariffsModal.classList.remove('hidden');
-  els.tariffsModal.setAttribute('aria-hidden', 'false');
-}
-
-function closeTariffs() {
-  els.tariffsModal.classList.add('hidden');
-  els.tariffsModal.setAttribute('aria-hidden', 'true');
-}
-
-if (els.tariffsBtn) {
-  els.tariffsBtn.addEventListener('click', openTariffs);
-}
-if (els.tariffsClose) {
-  els.tariffsClose.addEventListener('click', closeTariffs);
-}
-if (els.tariffsCloseBtn) {
-  els.tariffsCloseBtn.addEventListener('click', closeTariffs);
-}
-
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (els.registerModal && !els.registerModal.classList.contains('hidden')) {
     closeRegister();
-  }
-  if (els.legalModal && !els.legalModal.classList.contains('hidden')) {
-    closeLegal();
-  }
-  if (els.tariffsModal && !els.tariffsModal.classList.contains('hidden')) {
-    closeTariffs();
   }
 });
 

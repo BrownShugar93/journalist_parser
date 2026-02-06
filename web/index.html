@@ -42,10 +42,6 @@
         </div>
 
         <div class="info" id="accountInfo"></div>
-        <div class="row">
-          <button id="payBtn" class="ghost hidden">Оплатить доступ на 1 день</button>
-          <div class="hint" id="payHint"></div>
-        </div>
 
         <div class="grid">
           <div class="field">
@@ -58,33 +54,39 @@
           </div>
         </div>
 
-        <div class="field">
-          <label for="keywords">Ключевые слова (через запятую или построчно)</label>
-          <textarea id="keywords" rows="4">курьер</textarea>
-        </div>
+        <div class="dashboard-grid">
+          <div class="dashboard-left">
+            <div class="field">
+              <label for="keywords">Ключевые слова (через запятую или построчно)</label>
+              <textarea id="keywords" rows="4">курьер</textarea>
+            </div>
 
-        <div class="field">
-          <label for="channels">Каналы (t.me/... или @username, по одному в строке)</label>
-          <textarea id="channels" rows="6">https://t.me/mod_russia
+            <div class="field">
+              <label for="channels">Каналы (t.me/... или @username, по одному в строке)</label>
+              <textarea id="channels" rows="6">https://t.me/mod_russia
 https://t.me/rogozin_do</textarea>
-        </div>
+            </div>
 
-        <button id="videosOnly" class="toggle-btn is-active" type="button">Искать только посты с видео</button>
+            <button id="videosOnly" class="toggle-btn is-active" type="button">Искать только посты с видео</button>
 
-        <div class="row">
-          <button id="runBtn">Запуск</button>
-          <div class="hint" id="runHint"></div>
-        </div>
-
-        <div class="results hidden" id="results">
-          <div class="panel__head">
-            <h3>Результаты</h3>
             <div class="row">
-              <button id="downloadCsv" class="ghost">Скачать CSV</button>
-              <button id="downloadTxt" class="ghost">Скачать TXT</button>
+              <button id="runBtn">Запуск</button>
+              <div class="hint" id="runHint"></div>
             </div>
           </div>
-          <pre id="linksOutput"></pre>
+
+          <div class="dashboard-right">
+            <div class="results hidden" id="results">
+              <div class="panel__head">
+                <h3>Результаты</h3>
+                <div class="row">
+                  <button id="downloadCsv" class="ghost">Скачать CSV</button>
+                  <button id="downloadTxt" class="ghost">Скачать TXT</button>
+                </div>
+              </div>
+              <pre id="linksOutput"></pre>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -92,69 +94,10 @@ https://t.me/rogozin_do</textarea>
         <span class="footer__version">v0.1</span>
         <span class="footer__links">
           <a class="footer__link" href="mailto:Behal.inc@gmail.com">Поддержка</a>
-          <button id="tariffsBtn" class="footer__link" type="button">Тарифы</button>
-          <button id="legalBtn" class="footer__link" type="button">Реквизиты</button>
         </span>
       </footer>
     </main>
 
-    <div id="legalModal" class="modal hidden" aria-hidden="true">
-      <div class="modal__backdrop" id="legalClose"></div>
-      <div class="modal__panel">
-        <div class="modal__head">
-          <div class="modal__title">Реквизиты и условия</div>
-          <button id="legalCloseBtn" class="ghost-btn" type="button">Закрыть</button>
-        </div>
-        <div class="modal__body">
-          <div class="section__title">Реквизиты</div>
-          <div class="section__text">
-            Самозанятый: Забелин Глеб Сергеевич<br />
-            ИНН: 772035233003
-          </div>
-
-          <div class="section__title">Описание услуг</div>
-          <div class="section__text">
-            Предоставление онлайн‑доступа к сервису поиска публикаций в Telegram по ключевым словам.
-          </div>
-
-          <div class="section__title">Возврат</div>
-          <div class="section__text">
-            По вопросам возврата и отказа от услуги, пожалуйста, пишите на
-            <a href="mailto:Behal.inc@gmail.com">Behal.inc@gmail.com</a>.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="tariffsModal" class="modal hidden" aria-hidden="true">
-      <div class="modal__backdrop" id="tariffsClose"></div>
-      <div class="modal__panel">
-        <div class="modal__head">
-          <div class="modal__title">Тарифы</div>
-          <button id="tariffsCloseBtn" class="ghost-btn" type="button">Закрыть</button>
-        </div>
-        <div class="modal__body">
-          <div class="prices">
-            <div class="price-card">
-              <div class="price-card__title">Сутки</div>
-              <div class="price-card__value">93 ₽</div>
-            </div>
-            <div class="price-card">
-              <div class="price-card__title">Месяц</div>
-              <div class="price-card__value">999 ₽</div>
-            </div>
-            <div class="price-card">
-              <div class="price-card__title">Год</div>
-              <div class="price-card__value">4777 ₽</div>
-            </div>
-          </div>
-          <div class="section__title">Условия оказания услуг</div>
-          <div class="section__text">
-            Доступ предоставляется на выбранный срок после подтверждения оплаты. Услуга оказывается в электронном виде.
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div id="registerModal" class="modal hidden" aria-hidden="true">
       <div class="modal__backdrop" id="registerClose"></div>
