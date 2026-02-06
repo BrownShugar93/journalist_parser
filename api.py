@@ -34,7 +34,7 @@ LINK_RE = re.compile(r"https?://t\.me/([^/]+)/(\d+)")
 MAX_CHANNELS = 100
 MAX_KEYWORDS = 7
 MAX_DAYS_WINDOW = 60
-MAX_DAILY_RUNS = 5
+MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.05
 
 API_ID = os.getenv("TG_API_ID", "").strip()
