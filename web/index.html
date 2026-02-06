@@ -32,6 +32,7 @@
           <button id="registerBtn" class="ghost">Зарегистрироваться</button>
           <div class="hint" id="loginHint"></div>
         </div>
+        <div class="hint">Ищет посты в Telegram по ключевым словам.</div>
       </section>
 
       <div class="main-grid">
@@ -55,6 +56,17 @@
           </div>
 
           <div class="dashboard-left">
+            <div class="field">
+              <label for="channelList">Списки каналов</label>
+              <div class="select-wrap">
+                <select id="channelList" class="select-btn">
+                  <option value="voenkory">Военкоры</option>
+                  <option value="news">Новости</option>
+                  <option value="custom">Свой вариант</option>
+                </select>
+                <span class="select-arrow">▾</span>
+              </div>
+            </div>
             <div class="field">
               <label for="keywords">Ключевые слова (через запятую или построчно)</label>
               <textarea id="keywords" rows="4">курьер</textarea>
