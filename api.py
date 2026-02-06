@@ -31,7 +31,7 @@ CHANNEL_RE = re.compile(
 )
 LINK_RE = re.compile(r"https?://t\.me/([^/]+)/(\d+)")
 
-MAX_CHANNELS = 30
+MAX_CHANNELS = 100
 MAX_KEYWORDS = 7
 MAX_DAYS_WINDOW = 60
 MAX_DAILY_RUNS = 5
