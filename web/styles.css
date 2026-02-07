@@ -64,11 +64,11 @@ body {
 }
 
 .splash__btn {
-  background: rgba(36, 92, 115, 0.4);
-  color: var(--text);
-  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--label);
+  border: none;
   padding: 18px 40px;
-  font-size: 22px;
+  font-size: 30px;
   cursor: pointer;
 }
 
@@ -89,7 +89,7 @@ body {
   background: transparent;
   border: none;
   color: var(--label);
-  font-size: 28px;
+  font-size: 30px;
   text-align: left;
   cursor: pointer;
   padding: 8px 0;
@@ -123,6 +123,10 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+}
+
+.panel__head h3 {
+  font-size: 20px;
 }
 
 pre {
