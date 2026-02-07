@@ -1,14 +1,14 @@
 import os
 import re
 import asyncio
-from datetime import datetime, timezone, timedelta, date
-from typing import List, Dict, Tuple, Optional, Callable
 import uuid
+from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
+from typing import List, Dict, Tuple, Optional, Callable
 
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
@@ -17,15 +17,11 @@ from telethon.sessions import StringSession
 from db import (
     init_db,
     get_user_by_email,
-    get_user_by_id,
-    get_session,
-    delete_session,
     reset_daily_runs_if_needed,
     update_daily_runs,
     create_user,
-    set_access_until,
 )
-from auth import generate_salt, hash_password, verify_password, create_session_token
+from auth import generate_salt, hash_password
 
 CHANNEL_RE = re.compile(
     r"(?:https?://t\.me/(?:s/)?|@)?(?P<user>[A-Za-z0-9_]{4,})", re.IGNORECASE
@@ -38,21 +34,23 @@ MAX_DAYS_WINDOW = 60
 MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.05
 
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
+
 API_ID = os.getenv("TG_API_ID", "").strip()
 API_HASH = os.getenv("TG_API_HASH", "").strip()
 SESSION_NAME = os.getenv("TG_SESSION_NAME", "tg_service_session")
 TG_STRING_SESSION = os.getenv("TG_STRING_SESSION", "").strip()
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
-AUTH_DISABLED = os.getenv("AUTH_DISABLED", "").strip().lower() in ("1", "true", "yes")
 
-load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
+GUEST_EMAIL = "guest@vestigator.local"
 
 app = FastAPI(title="TG Video Parser API")
 
 APP_VERSION = "2026-02-06-free-access"
 
 JOBS: Dict[str, Dict[str, object]] = {}
+JOB_TTL_SECONDS = 60 * 30
+JOB_MAX_ITEMS = 200
 
 origins = ["*"] if CORS_ORIGINS.strip() == "*" else [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
@@ -63,22 +61,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class LoginResponse(BaseModel):
-    token: str
-    expires_at: str
-    access_until: Optional[str]
-
-
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
 
 
 class SearchRequest(BaseModel):
@@ -108,22 +90,6 @@ class SearchStatusResponse(BaseModel):
     rows: Optional[List[Tuple[str, str]]] = None
 
 
-class MeResponse(BaseModel):
-    email: str
-    access_until: Optional[str]
-    daily_runs_remaining: int
-
-
-class AdminCreateUserRequest(BaseModel):
-    email: str
-    password: str
-
-
-class AdminGrantAccessRequest(BaseModel):
-    email: str
-    days: int = 1
-
-
 
 
 @app.on_event("startup")
@@ -131,18 +97,42 @@ def on_startup():
     if not API_ID or not API_HASH:
         raise RuntimeError("TG_API_ID/TG_API_HASH are required")
     init_db()
-    if AUTH_DISABLED:
-        _ensure_guest_user()
+    _ensure_guest_user()
+    asyncio.create_task(_jobs_gc_loop())
+
+
+async def _jobs_gc_loop():
+    while True:
+        _cleanup_jobs()
+        await asyncio.sleep(60)
+
+
+def _cleanup_jobs():
+    now = datetime.now(timezone.utc).timestamp()
+    expired = []
+    for job_id, job in JOBS.items():
+        created = float(job.get("created_at", now))
+        if now - created > JOB_TTL_SECONDS:
+            expired.append(job_id)
+    for job_id in expired:
+        JOBS.pop(job_id, None)
+
+    if len(JOBS) > JOB_MAX_ITEMS:
+        sorted_jobs = sorted(
+            JOBS.items(),
+            key=lambda kv: float(kv[1].get("created_at", now)),
+        )
+        for job_id, _ in sorted_jobs[: max(0, len(JOBS) - JOB_MAX_ITEMS)]:
+            JOBS.pop(job_id, None)
 
 
 def _ensure_guest_user():
-    guest_email = "guest@vestigator.local"
-    user = get_user_by_email(guest_email)
+    user = get_user_by_email(GUEST_EMAIL)
     if user:
         return
     salt = generate_salt()
     password_hash = hash_password("guest", salt)
-    create_user(guest_email, password_hash, salt)
+    create_user(GUEST_EMAIL, password_hash, salt)
 
 
 def _parse_date(s: str) -> date:
@@ -295,104 +285,21 @@ async def _search_videos_and_texts(
 
 
 def _get_user_from_token(auth_header: Optional[str]):
-    if AUTH_DISABLED:
-        guest = get_user_by_email("guest@vestigator.local")
-        if guest:
-            return guest
-        _ensure_guest_user()
-        guest = get_user_by_email("guest@vestigator.local")
-        if guest:
-            return guest
-    if not auth_header:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Нужна авторизация")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный токен")
-    token = auth_header.split(" ", 1)[1].strip()
-    sess = get_session(token)
-    if not sess:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Сессия не найдена")
-    expires_at = datetime.fromisoformat(sess["expires_at"])
-    if expires_at < datetime.now(timezone.utc):
-        delete_session(token)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Сессия истекла")
-    user = get_user_by_id(int(sess["user_id"]))
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
-    return user
+    guest = get_user_by_email(GUEST_EMAIL)
+    if guest:
+        return guest
+    _ensure_guest_user()
+    guest = get_user_by_email(GUEST_EMAIL)
+    if guest:
+        return guest
+    raise HTTPException(status_code=500, detail="Guest user not available")
 
 
-def _require_admin(token_header: Optional[str]):
-    if not ADMIN_TOKEN:
-        raise HTTPException(status_code=500, detail="ADMIN_TOKEN не задан")
-    if not token_header or token_header.strip() != ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="Недостаточно прав")
-
-
-
-
-@app.post("/auth/login", response_model=LoginResponse)
-def login(req: LoginRequest):
-    user = get_user_by_email(req.email)
-    if not user:
-        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
-    if not verify_password(req.password, user["password_salt"], user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
-
-    token, expires_at = create_session_token(int(user["id"]))
-    return LoginResponse(
-        token=token,
-        expires_at=expires_at.isoformat(),
-        access_until=user["access_until"],
-    )
-
-
-@app.post("/auth/register", response_model=LoginResponse)
-def register(req: RegisterRequest):
-    if not req.email or not req.password:
-        raise HTTPException(status_code=400, detail="Email и пароль обязательны")
-    existing = get_user_by_email(req.email)
-    if existing:
-        raise HTTPException(status_code=400, detail="Пользователь уже существует")
-
-    salt = generate_salt()
-    password_hash = hash_password(req.password, salt)
-    try:
-        user_id = create_user(req.email, password_hash, salt)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Пользователь уже существует")
-
-    token, expires_at = create_session_token(int(user_id))
-    return LoginResponse(
-        token=token,
-        expires_at=expires_at.isoformat(),
-        access_until=None,
-    )
-
-
-@app.post("/auth/logout")
-def logout(authorization: Optional[str] = Header(default=None)):
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-        delete_session(token)
-    return {"ok": True}
-
-
-@app.get("/auth/me", response_model=MeResponse)
-def me(authorization: Optional[str] = Header(default=None)):
-    user = _get_user_from_token(authorization)
-    today_str = datetime.now(timezone.utc).date().isoformat()
-    _, daily_count = reset_daily_runs_if_needed(int(user["id"]), today_str)
-    remaining = max(0, MAX_DAILY_RUNS - daily_count)
-    return MeResponse(
-        email=user["email"],
-        access_until=user["access_until"],
-        daily_runs_remaining=remaining,
-    )
 
 
 @app.post("/search", response_model=SearchResponse)
-async def search(req: SearchRequest, authorization: Optional[str] = Header(default=None)):
-    user = _get_user_from_token(authorization)
+async def search(req: SearchRequest):
+    user = _get_user_from_token(None)
 
     # Access gating temporarily disabled by request.
 
@@ -473,8 +380,8 @@ async def _run_job(job_id: str, req: SearchRequest):
 
 
 @app.post("/search/start", response_model=StartSearchResponse)
-async def start_search(req: SearchRequest, authorization: Optional[str] = Header(default=None)):
-    user = _get_user_from_token(authorization)
+async def start_search(req: SearchRequest):
+    user = _get_user_from_token(None)
 
     channels = _normalize_channels(req.channels)
     keywords = _normalize_keywords(req.keywords)
@@ -506,6 +413,7 @@ async def start_search(req: SearchRequest, authorization: Optional[str] = Header
         "rows": None,
         "user_id": int(user["id"]),
         "today_str": today_str,
+        "created_at": datetime.now(timezone.utc).timestamp(),
     }
     asyncio.create_task(_run_job(job_id, req))
     return StartSearchResponse(job_id=job_id)
@@ -532,30 +440,3 @@ def search_status(job_id: str):
 @app.get("/version")
 def version():
     return {"version": APP_VERSION}
-
-
-@app.post("/admin/create_user")
-def admin_create_user(
-    req: AdminCreateUserRequest, x_admin_token: Optional[str] = Header(default=None)
-):
-    _require_admin(x_admin_token)
-    salt = generate_salt()
-    password_hash = hash_password(req.password, salt)
-    try:
-        user_id = create_user(req.email, password_hash, salt)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Пользователь уже существует")
-    return {"user_id": user_id}
-
-
-@app.post("/admin/grant_access")
-def admin_grant_access(
-    req: AdminGrantAccessRequest, x_admin_token: Optional[str] = Header(default=None)
-):
-    _require_admin(x_admin_token)
-    user = get_user_by_email(req.email)
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    access_until = datetime.now(timezone.utc) + timedelta(days=req.days)
-    set_access_until(int(user["id"]), access_until)
-    return {"ok": True, "access_until": access_until.isoformat()}
