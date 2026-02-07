@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TG Parser</title>
+    <title>VESTIGATOR</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -16,57 +16,22 @@
       </section>
 
       <section class="workspace hidden" id="workspace">
-        <section class="panel" id="dashboardPanel">
-          <div class="panel__head">
-            <h2>Кабинет</h2>
-            <button id="logoutBtn" class="ghost">Выйти</button>
+        <div class="left-panel">
+          <button id="openChannels" class="menu-item">Каналы</button>
+          <div class="menu-sub" id="channelsSummary">Не выбраны</div>
+          <button id="openKeywords" class="menu-item">Ключевые слова</button>
+          <div class="menu-sub" id="keywordsSummary">Не выбраны</div>
+          <button id="openDates" class="menu-item">Даты</button>
+          <div class="menu-sub" id="datesSummary">Не выбраны</div>
+          <button id="runBtn" class="menu-item run-btn" disabled>Запуск</button>
+
+          <div class="progress hidden" id="progressWrap">
+            <div class="progress__bar" id="progressBar"></div>
           </div>
+          <div class="log" id="logBox"></div>
+        </div>
 
-          <div class="info" id="accountInfo"></div>
-
-          <div class="grid">
-            <div class="field">
-              <label for="startDate">Дата начала</label>
-              <input id="startDate" type="date" />
-            </div>
-            <div class="field">
-              <label for="endDate">Дата конца</label>
-              <input id="endDate" type="date" />
-            </div>
-          </div>
-
-          <div class="dashboard-left">
-            <div class="field">
-              <label for="channelList">Списки каналов</label>
-              <div class="select-wrap">
-                <select id="channelList" class="select-btn">
-                  <option value="voenkory">Военкоры</option>
-                  <option value="news">Новости</option>
-                  <option value="custom" selected>Свой вариант</option>
-                </select>
-                <span class="select-arrow">▾</span>
-              </div>
-            </div>
-            <div class="field">
-              <label for="keywords">Ключевые слова (через запятую или построчно)</label>
-              <textarea id="keywords" rows="4">курьер</textarea>
-            </div>
-
-            <div class="field">
-              <label for="channels">Каналы (t.me/... или @username, по одному в строке)</label>
-              <textarea id="channels" rows="6"></textarea>
-            </div>
-
-            <button id="videosOnly" class="toggle-btn" type="button">Искать только посты с видео</button>
-
-            <div class="row">
-              <button id="runBtn">Запуск</button>
-              <div class="hint" id="runHint"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel results-panel" id="resultsPanel">
+        <section class="panel results-panel hidden" id="resultsPanel">
           <div class="panel__head">
             <h3>Результаты</h3>
             <div class="row">
@@ -79,7 +44,70 @@
       </section>
     </main>
 
+    <div id="channelsModal" class="modal hidden" aria-hidden="true">
+      <div class="modal__backdrop" data-close="channels"></div>
+      <div class="modal__panel">
+        <div class="modal__head">
+          <div class="modal__title">Каналы</div>
+          <button class="ghost-btn" data-close="channels" type="button">Закрыть</button>
+        </div>
+        <div class="modal__body">
+          <div class="field">
+            <label for="channelList">Списки каналов</label>
+            <div class="select-wrap">
+              <select id="channelList" class="select-btn">
+                <option value="voenkory">Военкоры</option>
+                <option value="news">Новости</option>
+                <option value="custom" selected>Свой вариант</option>
+              </select>
+              <span class="select-arrow">▾</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="channels">Список каналов</label>
+            <textarea id="channels" rows="8"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
 
+    <div id="keywordsModal" class="modal hidden" aria-hidden="true">
+      <div class="modal__backdrop" data-close="keywords"></div>
+      <div class="modal__panel">
+        <div class="modal__head">
+          <div class="modal__title">Ключевые слова</div>
+          <button class="ghost-btn" data-close="keywords" type="button">Закрыть</button>
+        </div>
+        <div class="modal__body">
+          <div class="field">
+            <label for="keywords">Ключевые слова</label>
+            <textarea id="keywords" rows="6"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="datesModal" class="modal hidden" aria-hidden="true">
+      <div class="modal__backdrop" data-close="dates"></div>
+      <div class="modal__panel">
+        <div class="modal__head">
+          <div class="modal__title">Даты</div>
+          <button class="ghost-btn" data-close="dates" type="button">Закрыть</button>
+        </div>
+        <div class="modal__body">
+          <div class="grid">
+            <div class="field">
+              <label for="startDate">Дата начала</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="endDate">Дата конца</label>
+              <input id="endDate" type="date" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script src="config.js"></script>
     <script src="app.js"></script>

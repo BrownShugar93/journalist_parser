@@ -1,86 +1,33 @@
 const els = {
   loginBtn: document.getElementById('loginBtn'),
   loginHint: document.getElementById('loginHint'),
-  loginPanel: document.getElementById('loginPanel'),
-  dashboardPanel: document.getElementById('dashboardPanel'),
-  accountInfo: document.getElementById('accountInfo'),
-  logoutBtn: document.getElementById('logoutBtn'),
-  startDate: document.getElementById('startDate'),
-  endDate: document.getElementById('endDate'),
-  keywords: document.getElementById('keywords'),
-  channels: document.getElementById('channels'),
-  videosOnly: document.getElementById('videosOnly'),
-  runBtn: document.getElementById('runBtn'),
-  runHint: document.getElementById('runHint'),
-  resultsPanel: document.getElementById('resultsPanel'),
   splash: document.getElementById('splash'),
   workspace: document.getElementById('workspace'),
+  openChannels: document.getElementById('openChannels'),
+  openKeywords: document.getElementById('openKeywords'),
+  openDates: document.getElementById('openDates'),
+  runBtn: document.getElementById('runBtn'),
+  progressWrap: document.getElementById('progressWrap'),
+  progressBar: document.getElementById('progressBar'),
+  logBox: document.getElementById('logBox'),
+  resultsPanel: document.getElementById('resultsPanel'),
   linksOutput: document.getElementById('linksOutput'),
   downloadCsv: document.getElementById('downloadCsv'),
   downloadTxt: document.getElementById('downloadTxt'),
-  introText: document.getElementById('introText'),
-  introCursor: document.getElementById('introCursor'),
+  channelsModal: document.getElementById('channelsModal'),
+  keywordsModal: document.getElementById('keywordsModal'),
+  datesModal: document.getElementById('datesModal'),
   channelList: document.getElementById('channelList'),
+  channels: document.getElementById('channels'),
+  keywords: document.getElementById('keywords'),
+  startDate: document.getElementById('startDate'),
+  endDate: document.getElementById('endDate'),
 };
 
 const store = {
-  get token() { return localStorage.getItem('token'); },
-  set token(v) { if (v) localStorage.setItem('token', v); else localStorage.removeItem('token'); },
   get apiUrl() { return localStorage.getItem('apiUrl') || ''; },
   set apiUrl(v) { if (v) localStorage.setItem('apiUrl', v); },
 };
-
-const GUEST_MODE = window.GUEST_MODE === true;
-
-function setStatus(text) {
-  if (els.statusText) {
-    els.statusText.textContent = text;
-  }
-}
-
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.add('hidden'); }
-
-function todayISO() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
-}
-
-function csvBlob(rows) {
-  const header = 'link,text\n';
-  const lines = rows.map(([link, text]) => {
-    const esc = (s) => '"' + String(s).replace(/"/g, '""') + '"';
-    return `${esc(link)},${esc(text)}`;
-  });
-  return new Blob([header + lines.join('\n') + '\n'], { type: 'text/csv' });
-}
-
-function txtBlob(links) {
-  return new Blob([links.join('\n') + '\n'], { type: 'text/plain' });
-}
-
-async function apiFetch(path, options = {}) {
-  const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';
-  if (!apiUrl) throw new Error('API URL не задан');
-  const headers = options.headers || {};
-  if (store.token) headers['Authorization'] = `Bearer ${store.token}`;
-  if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`${apiUrl}${path}`, { ...options, headers });
-  return res;
-}
-
-async function loadMe() {
-  const res = await apiFetch('/auth/me');
-  if (res.status !== 200) {
-    throw new Error('Не удалось получить статус');
-  }
-  return res.json();
-}
-
-function setAccountInfo(me) {
-  const remaining = me.daily_runs_remaining ?? 0;
-  els.accountInfo.textContent = `Запусков осталось сегодня: ${remaining}`;
-}
 
 const channelLists = {
   voenkory: [
@@ -157,98 +104,104 @@ function applyChannelList(key) {
   els.channels.value = list.join('\n');
 }
 
-async function init() {
+function openModal(modal) {
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal(modal) {
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function updateRunState() {
+  const hasChannels = (els.channels.value || '').trim().length > 0;
+  const hasKeywords = (els.keywords.value || '').trim().length > 0;
+  const hasDates = (els.startDate.value || '').trim() && (els.endDate.value || '').trim();
+  const ok = hasChannels && hasKeywords && hasDates;
+  els.runBtn.disabled = !ok;
+  els.runBtn.classList.toggle('enabled', ok);
+}
+
+function log(msg) {
+  els.logBox.textContent = msg;
+}
+
+async function apiFetch(path, options = {}) {
   const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';
   store.apiUrl = apiUrl;
-  els.startDate.value = todayISO();
-  els.endDate.value = todayISO();
-
-  show(els.splash);
-  hide(els.workspace);
-  setStatus('');
+  const headers = options.headers || {};
+  if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  const res = await fetch(`${apiUrl}${path}`, { ...options, headers });
+  return res;
 }
 
-els.loginBtn.addEventListener('click', async () => {
-  els.loginHint.textContent = '';
-  hide(els.splash);
-  show(els.workspace);
-  show(els.dashboardPanel);
-  show(els.resultsPanel);
-  els.accountInfo.textContent = 'Гостевой режим';
-  if (els.channelList) {
-    if (!els.channelList.value) els.channelList.value = 'custom';
-    if (!els.channels.value.trim() && els.channelList.value !== 'custom') {
-      applyChannelList(els.channelList.value);
-    }
+function csvBlob(rows) {
+  const header = 'link,text\n';
+  const lines = rows.map(([link, text]) => {
+    const esc = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+    return `${esc(link)},${esc(text)}`;
+  });
+  return new Blob([header + lines.join('\n') + '\n'], { type: 'text/csv' });
+}
+
+function txtBlob(links) {
+  return new Blob([links.join('\n') + '\n'], { type: 'text/plain' });
+}
+
+els.loginBtn.addEventListener('click', () => {
+  els.splash.classList.add('hidden');
+  els.workspace.classList.remove('hidden');
+});
+
+els.openChannels.addEventListener('click', () => openModal(els.channelsModal));
+els.openKeywords.addEventListener('click', () => openModal(els.keywordsModal));
+els.openDates.addEventListener('click', () => openModal(els.datesModal));
+
+els.channelList.addEventListener('change', () => {
+  if (els.channelList.value === 'custom') {
+    els.channels.value = '';
+  } else {
+    applyChannelList(els.channelList.value);
   }
+  updateRunState();
 });
 
-els.logoutBtn.addEventListener('click', async () => {
-  try {
-    await apiFetch('/auth/logout', { method: 'POST' });
-  } catch (_) {}
-  store.token = null;
-  await init();
+els.channels.addEventListener('input', () => {
+  if (els.channelList.value !== 'custom') {
+    els.channelList.value = 'custom';
+  }
+  updateRunState();
 });
 
-  els.videosOnly.addEventListener('click', () => {
-    const isActive = els.videosOnly.classList.toggle('is-active');
-    els.videosOnly.dataset.active = isActive ? '1' : '0';
-  });
-
-if (els.channelList) {
-  els.channelList.addEventListener('change', () => {
-    const val = els.channelList.value;
-    if (val === 'custom') {
-      els.channels.value = '';
-      return;
-    }
-    applyChannelList(val);
-  });
-}
-
-if (els.channels && els.channelList) {
-  els.channels.addEventListener('input', () => {
-    if (els.channelList.value !== 'custom') {
-      els.channelList.value = 'custom';
-    }
-  });
-}
+els.keywords.addEventListener('input', updateRunState);
+els.startDate.addEventListener('change', updateRunState);
+els.endDate.addEventListener('change', updateRunState);
 
 els.runBtn.addEventListener('click', async () => {
-  els.runHint.textContent = '';
+  if (els.runBtn.disabled) return;
+  els.resultsPanel.classList.add('hidden');
   els.linksOutput.textContent = '';
-
-  const keywords = els.keywords.value
-    .split(/[\n,]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const channels = els.channels.value
-    .split(/\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  if (!keywords.length) {
-    els.runHint.textContent = 'Ключевые слова пустые.';
-    return;
-  }
-  if (!channels.length) {
-    els.runHint.textContent = 'Каналы пустые.';
-    return;
-  }
+  els.progressWrap.classList.remove('hidden');
+  els.progressBar.style.width = '10%';
+  log('Запрос отправлен...');
 
   const payload = {
-    channels,
-    keywords,
+    channels: (els.channels.value || '').split(/\n/).map((s) => s.trim()).filter(Boolean),
+    keywords: (els.keywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
     start_date: els.startDate.value,
     end_date: els.endDate.value,
-    videos_only: els.videosOnly.classList.contains('is-active'),
+    videos_only: false,
   };
 
-  els.runBtn.disabled = true;
-  els.runBtn.textContent = 'Поиск...';
+  let tick = 10;
+  const timer = setInterval(() => {
+    tick = Math.min(90, tick + 5);
+    els.progressBar.style.width = `${tick}%`;
+  }, 400);
 
   try {
+    log('Поиск...');
     const res = await apiFetch('/search', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -264,6 +217,7 @@ els.runBtn.addEventListener('click', async () => {
     const rows = data.rows || [];
 
     els.linksOutput.textContent = links.length ? links.join('\n') : 'Пока пусто.';
+    els.resultsPanel.classList.remove('hidden');
 
     els.downloadCsv.onclick = () => {
       const blob = csvBlob(rows);
@@ -285,18 +239,30 @@ els.runBtn.addEventListener('click', async () => {
       URL.revokeObjectURL(url);
     };
 
-    const me = await loadMe();
-    setAccountInfo(me);
+    log('Готово');
   } catch (e) {
-    els.runHint.textContent = e.message;
+    log(e.message);
   } finally {
-    els.runBtn.disabled = false;
-    els.runBtn.textContent = 'Запуск';
+    clearInterval(timer);
+    els.progressBar.style.width = '100%';
+    setTimeout(() => {
+      els.progressWrap.classList.add('hidden');
+      els.progressBar.style.width = '0%';
+    }, 600);
   }
 });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
+Array.from(document.querySelectorAll('[data-close]')).forEach((el) => {
+  el.addEventListener('click', () => {
+    const key = el.getAttribute('data-close');
+    const modal = key === 'channels' ? els.channelsModal : key === 'keywords' ? els.keywordsModal : els.datesModal;
+    closeModal(modal);
+  });
 });
 
-init();
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  [els.channelsModal, els.keywordsModal, els.datesModal].forEach((m) => m && closeModal(m));
+});
+
+updateRunState();
