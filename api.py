@@ -2,7 +2,8 @@ import os
 import re
 import asyncio
 from datetime import datetime, timezone, timedelta, date
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Callable
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -51,6 +52,8 @@ app = FastAPI(title="TG Video Parser API")
 
 APP_VERSION = "2026-02-06-free-access"
 
+JOBS: Dict[str, Dict[str, object]] = {}
+
 origins = ["*"] if CORS_ORIGINS.strip() == "*" else [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -89,6 +92,20 @@ class SearchRequest(BaseModel):
 class SearchResponse(BaseModel):
     links: List[str]
     rows: List[Tuple[str, str]]
+
+
+class StartSearchResponse(BaseModel):
+    job_id: str
+
+
+class SearchStatusResponse(BaseModel):
+    job_id: str
+    done: bool
+    progress: float
+    log: Optional[str]
+    error: Optional[str]
+    links: Optional[List[str]] = None
+    rows: Optional[List[Tuple[str, str]]] = None
 
 
 class MeResponse(BaseModel):
@@ -208,6 +225,7 @@ async def _search_videos_and_texts(
     end: datetime,
     videos_only: bool,
     throttle: float,
+    progress_cb: Optional[Callable[[float, str], None]] = None,
 ) -> Tuple[List[str], List[Tuple[str, str]]]:
     found: Dict[str, Tuple[datetime, str, str, str]] = {}
     end_inclusive = end + timedelta(seconds=1)
@@ -215,6 +233,8 @@ async def _search_videos_and_texts(
     session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
 
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
+        total_steps = max(1, len(channels) * max(1, len(keywords)))
+        done_steps = 0
         for ch in channels:
             try:
                 entity = await client.get_entity(ch)
@@ -222,6 +242,8 @@ async def _search_videos_and_texts(
                 continue
 
             for kw in keywords:
+                if progress_cb:
+                    progress_cb(min(0.9, done_steps / total_steps * 0.9), f"@{ch} — «{kw}»")
                 async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
                     if not msg or not msg.date:
                         continue
@@ -245,6 +267,9 @@ async def _search_videos_and_texts(
 
                     if throttle > 0:
                         await asyncio.sleep(throttle)
+                done_steps += 1
+                if progress_cb:
+                    progress_cb(min(0.9, done_steps / total_steps * 0.9), f"@{ch} — «{kw}»")
 
     final = sorted(found.values(), key=lambda x: x[0])
     links_only = [link for _, _, _, link in final]
@@ -253,12 +278,16 @@ async def _search_videos_and_texts(
     session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
 
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
-        for link in links_only:
+        total_links = max(1, len(links_only))
+        for i, link in enumerate(links_only, start=1):
             try:
                 text = await _fetch_text_by_link(client, link)
             except Exception:
                 text = ""
             rows.append((link, text))
+            if progress_cb:
+                pct = 0.9 + (i / total_links) * 0.1
+                progress_cb(min(1.0, pct), f"Тексты: {i}/{len(links_only)}")
             if throttle > 0:
                 await asyncio.sleep(throttle)
 
@@ -405,6 +434,97 @@ async def search(req: SearchRequest, authorization: Optional[str] = Header(defau
         update_daily_runs(int(user["id"]), today_str, daily_count + 1)
 
     return SearchResponse(links=links_only, rows=rows)
+
+
+async def _run_job(job_id: str, req: SearchRequest):
+    def progress_cb(pct: float, msg: str):
+        JOBS[job_id]["progress"] = pct * 100
+        JOBS[job_id]["log"] = msg
+
+    try:
+        channels = _normalize_channels(req.channels)
+        keywords = _normalize_keywords(req.keywords)
+        start_d = _parse_date(req.start_date)
+        end_d = _parse_date(req.end_date)
+        start, end = _utc_window(start_d, end_d)
+
+        links_only, rows = await _search_videos_and_texts(
+            channels=channels,
+            keywords=keywords,
+            start=start,
+            end=end,
+            videos_only=req.videos_only,
+            throttle=THROTTLE_SECONDS,
+            progress_cb=progress_cb,
+        )
+        JOBS[job_id]["links"] = links_only
+        JOBS[job_id]["rows"] = rows
+        JOBS[job_id]["done"] = True
+        JOBS[job_id]["progress"] = 100.0
+        JOBS[job_id]["log"] = "Готово"
+        if links_only:
+            user_id = int(JOBS[job_id]["user_id"])
+            today_str = str(JOBS[job_id]["today_str"])
+            _, daily_count = reset_daily_runs_if_needed(user_id, today_str)
+            update_daily_runs(user_id, today_str, daily_count + 1)
+    except Exception as e:
+        JOBS[job_id]["done"] = True
+        JOBS[job_id]["error"] = str(e)
+
+
+@app.post("/search/start", response_model=StartSearchResponse)
+async def start_search(req: SearchRequest, authorization: Optional[str] = Header(default=None)):
+    user = _get_user_from_token(authorization)
+
+    channels = _normalize_channels(req.channels)
+    keywords = _normalize_keywords(req.keywords)
+    if not channels:
+        raise HTTPException(status_code=400, detail="Нет каналов")
+    if not keywords:
+        raise HTTPException(status_code=400, detail="Нет ключевых слов")
+    if len(channels) > MAX_CHANNELS:
+        raise HTTPException(status_code=400, detail=f"Слишком много каналов (макс {MAX_CHANNELS})")
+    if len(keywords) > MAX_KEYWORDS:
+        raise HTTPException(status_code=400, detail=f"Слишком много ключей (макс {MAX_KEYWORDS})")
+    start_d = _parse_date(req.start_date)
+    end_d = _parse_date(req.end_date)
+    if (end_d - start_d).days > MAX_DAYS_WINDOW:
+        raise HTTPException(status_code=400, detail=f"Слишком широкий период (макс {MAX_DAYS_WINDOW} дней)")
+
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    _, daily_count = reset_daily_runs_if_needed(int(user["id"]), today_str)
+    if daily_count >= MAX_DAILY_RUNS:
+        raise HTTPException(status_code=429, detail="Достигнут дневной лимит запусков")
+
+    job_id = uuid.uuid4().hex
+    JOBS[job_id] = {
+        "done": False,
+        "progress": 0.0,
+        "log": "Старт",
+        "error": None,
+        "links": None,
+        "rows": None,
+        "user_id": int(user["id"]),
+        "today_str": today_str,
+    }
+    asyncio.create_task(_run_job(job_id, req))
+    return StartSearchResponse(job_id=job_id)
+
+
+@app.get("/search/status/{job_id}", response_model=SearchStatusResponse)
+def search_status(job_id: str):
+    job = JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    return SearchStatusResponse(
+        job_id=job_id,
+        done=bool(job.get("done")),
+        progress=float(job.get("progress") or 0.0),
+        log=job.get("log"),
+        error=job.get("error"),
+        links=job.get("links"),
+        rows=job.get("rows"),
+    )
 
 
 

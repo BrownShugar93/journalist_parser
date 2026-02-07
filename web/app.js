@@ -6,6 +6,9 @@ const els = {
   openChannels: document.getElementById('openChannels'),
   openKeywords: document.getElementById('openKeywords'),
   openDates: document.getElementById('openDates'),
+  channelsSummary: document.getElementById('channelsSummary'),
+  keywordsSummary: document.getElementById('keywordsSummary'),
+  datesSummary: document.getElementById('datesSummary'),
   runBtn: document.getElementById('runBtn'),
   progressWrap: document.getElementById('progressWrap'),
   progressBar: document.getElementById('progressBar'),
@@ -121,6 +124,16 @@ function updateRunState() {
   const ok = hasChannels && hasKeywords && hasDates;
   els.runBtn.disabled = !ok;
   els.runBtn.classList.toggle('enabled', ok);
+
+  const chCount = (els.channels.value || '').split(/\n/).map((s) => s.trim()).filter(Boolean).length;
+  const kwCount = (els.keywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean).length;
+  els.channelsSummary.textContent = chCount ? `Выбрано каналов: ${chCount}` : 'Не выбраны';
+  els.keywordsSummary.textContent = kwCount ? `Ключей: ${kwCount}` : 'Не выбраны';
+  if (els.startDate.value && els.endDate.value) {
+    els.datesSummary.textContent = `Период: ${els.startDate.value} → ${els.endDate.value}`;
+  } else {
+    els.datesSummary.textContent = 'Не выбраны';
+  }
 }
 
 function log(msg) {
@@ -193,57 +206,66 @@ els.runBtn.addEventListener('click', async () => {
     end_date: els.endDate.value,
     videos_only: false,
   };
-
-  let tick = 10;
-  const timer = setInterval(() => {
-    tick = Math.min(90, tick + 5);
-    els.progressBar.style.width = `${tick}%`;
-  }, 400);
-
   try {
-    log('Поиск...');
-    const res = await apiFetch('/search', {
+    log('Создаю задачу...');
+    const startRes = await apiFetch('/search/start', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-
-    if (res.status !== 200) {
-      const data = await res.json().catch(() => ({}));
+    if (startRes.status !== 200) {
+      const data = await startRes.json().catch(() => ({}));
       throw new Error(data.detail || 'Ошибка');
     }
+    const { job_id } = await startRes.json();
+    if (!job_id) throw new Error('Не получил job_id');
 
-    const data = await res.json();
-    const links = data.links || [];
-    const rows = data.rows || [];
+    let done = false;
+    while (!done) {
+      const st = await apiFetch(`/search/status/${job_id}`);
+      if (st.status !== 200) {
+        const data = await st.json().catch(() => ({}));
+        throw new Error(data.detail || 'Ошибка статуса');
+      }
+      const data = await st.json();
+      const pct = Math.max(0, Math.min(100, data.progress || 0));
+      els.progressBar.style.width = `${pct}%`;
+      if (data.log) log(data.log);
+      if (data.error) throw new Error(data.error);
+      if (data.done) {
+        const links = data.links || [];
+        const rows = data.rows || [];
+        els.linksOutput.textContent = links.length ? links.join('\\n') : 'Пока пусто.';
+        els.resultsPanel.classList.remove('hidden');
 
-    els.linksOutput.textContent = links.length ? links.join('\n') : 'Пока пусто.';
-    els.resultsPanel.classList.remove('hidden');
+        els.downloadCsv.onclick = () => {
+          const blob = csvBlob(rows);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'tg_links.csv';
+          a.click();
+          URL.revokeObjectURL(url);
+        };
 
-    els.downloadCsv.onclick = () => {
-      const blob = csvBlob(rows);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'tg_links.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    };
+        els.downloadTxt.onclick = () => {
+          const blob = txtBlob(links);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'tg_links.txt';
+          a.click();
+          URL.revokeObjectURL(url);
+        };
 
-    els.downloadTxt.onclick = () => {
-      const blob = txtBlob(links);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'tg_links.txt';
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
-    log('Готово');
+        log('Готово');
+        done = true;
+      } else {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    }
   } catch (e) {
     log(e.message);
   } finally {
-    clearInterval(timer);
     els.progressBar.style.width = '100%';
     setTimeout(() => {
       els.progressWrap.classList.add('hidden');

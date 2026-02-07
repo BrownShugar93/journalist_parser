@@ -95,6 +95,13 @@ body {
   padding: 8px 0;
 }
 
+.menu-sub {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: -6px;
+  margin-bottom: 8px;
+}
+
 .run-btn {
   color: #777;
   cursor: not-allowed;
