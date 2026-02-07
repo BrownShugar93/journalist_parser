@@ -13,6 +13,8 @@ const els = {
   runBtn: document.getElementById('runBtn'),
   runHint: document.getElementById('runHint'),
   resultsPanel: document.getElementById('resultsPanel'),
+  splash: document.getElementById('splash'),
+  workspace: document.getElementById('workspace'),
   linksOutput: document.getElementById('linksOutput'),
   downloadCsv: document.getElementById('downloadCsv'),
   downloadTxt: document.getElementById('downloadTxt'),
@@ -156,73 +158,28 @@ function applyChannelList(key) {
 }
 
 async function init() {
-  const greeting = 'Quaerendo invenietis. Ища, найдёте.';
-  if (els.introText && els.introCursor && !els.introText.dataset.typed) {
-    let i = 0;
-    els.introText.textContent = '';
-    els.introCursor.classList.add('hidden');
-    const timer = setInterval(() => {
-      els.introText.textContent = greeting.slice(0, i + 1);
-      i += 1;
-      if (i >= greeting.length) {
-        clearInterval(timer);
-        els.introText.dataset.typed = '1';
-        els.introCursor.classList.remove('hidden');
-      }
-    }, 56);
-  }
-
   const apiUrl = (window.API_URL || '').trim() || store.apiUrl || 'http://localhost:8000';
   store.apiUrl = apiUrl;
   els.startDate.value = todayISO();
   els.endDate.value = todayISO();
 
-  if (store.token) {
-    try {
-      const me = await loadMe();
-      hide(els.loginPanel);
-      show(els.dashboardPanel);
-      show(els.resultsPanel);
-      document.body.classList.add('is-auth');
-      if (els.channelList) {
-        if (!els.channelList.value) els.channelList.value = 'custom';
-        if (!els.channels.value.trim() && els.channelList.value !== 'custom') {
-          applyChannelList(els.channelList.value);
-        }
-      }
-      setAccountInfo(me);
-      setStatus('Онлайн');
-      return;
-    } catch (e) {
-      store.token = null;
-    }
-  }
-
-  if (GUEST_MODE) {
-    hide(els.loginPanel);
-    show(els.dashboardPanel);
-    show(els.resultsPanel);
-    document.body.classList.add('is-auth');
-    els.accountInfo.textContent = 'Гостевой режим';
-    return;
-  }
-
-  show(els.loginPanel);
-  hide(els.dashboardPanel);
-  hide(els.resultsPanel);
-  document.body.classList.remove('is-auth');
-  setStatus('Ожидание входа');
+  show(els.splash);
+  hide(els.workspace);
+  setStatus('');
 }
 
 els.loginBtn.addEventListener('click', async () => {
   els.loginHint.textContent = '';
-  if (GUEST_MODE) {
-    hide(els.loginPanel);
-    show(els.dashboardPanel);
-    show(els.resultsPanel);
-    document.body.classList.add('is-auth');
-    els.accountInfo.textContent = 'Гостевой режим';
-    return;
+  hide(els.splash);
+  show(els.workspace);
+  show(els.dashboardPanel);
+  show(els.resultsPanel);
+  els.accountInfo.textContent = 'Гостевой режим';
+  if (els.channelList) {
+    if (!els.channelList.value) els.channelList.value = 'custom';
+    if (!els.channels.value.trim() && els.channelList.value !== 'custom') {
+      applyChannelList(els.channelList.value);
+    }
   }
 });
 
