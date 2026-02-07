@@ -58,9 +58,8 @@ body {
   min-height: 70vh;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 16px;
 }
 
 .splash__btn {
