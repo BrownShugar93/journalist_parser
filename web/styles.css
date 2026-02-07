@@ -37,7 +37,7 @@ body {
 .bg-image {
   position: fixed;
   inset: 0;
-  background-image: url("bg33.png");
+  background-image: url("bg37.png");
   background-size: cover;
   background-position: center;
   filter: saturate(1.15) contrast(1.08);
