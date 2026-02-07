@@ -114,6 +114,21 @@ body {
   cursor: pointer;
 }
 
+.mini-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: #777;
+  font-size: 12px;
+  padding: 4px 10px;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.mini-toggle.is-active {
+  color: var(--text);
+  border-color: var(--text);
+}
+
 .panel {
   border: 1px solid var(--border);
   padding: 16px;

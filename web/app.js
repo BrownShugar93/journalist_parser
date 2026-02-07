@@ -9,6 +9,7 @@ const els = {
   channelsSummary: document.getElementById('channelsSummary'),
   keywordsSummary: document.getElementById('keywordsSummary'),
   datesSummary: document.getElementById('datesSummary'),
+  videosOnly: document.getElementById('videosOnly'),
   runBtn: document.getElementById('runBtn'),
   progressWrap: document.getElementById('progressWrap'),
   progressBar: document.getElementById('progressBar'),
@@ -204,7 +205,7 @@ els.runBtn.addEventListener('click', async () => {
     keywords: (els.keywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
     start_date: els.startDate.value,
     end_date: els.endDate.value,
-    videos_only: false,
+    videos_only: els.videosOnly.classList.contains('is-active'),
   };
   try {
     log('Создаю задачу...');
@@ -272,6 +273,10 @@ els.runBtn.addEventListener('click', async () => {
       els.progressBar.style.width = '0%';
     }, 600);
   }
+});
+
+els.videosOnly.addEventListener('click', () => {
+  els.videosOnly.classList.toggle('is-active');
 });
 
 Array.from(document.querySelectorAll('[data-close]')).forEach((el) => {
