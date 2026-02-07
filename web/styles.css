@@ -69,6 +69,7 @@ body {
   border: none;
   padding: 18px 40px;
   font-size: 30px;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -91,6 +92,7 @@ body {
   color: var(--label);
   font-size: 30px;
   text-align: left;
+  font-family: inherit;
   cursor: pointer;
   padding: 8px 0;
 }
