@@ -42,13 +42,15 @@ body {
 }
 
 .terminal {
-  width: min(760px, 100%);
+  width: min(860px, 100%);
   background: rgba(2, 3, 10, 0.5);
   border: 1px solid var(--border);
   padding: 20px;
   position: relative;
   z-index: 1;
   backdrop-filter: blur(6px);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
 }
 
 .hero {
@@ -72,6 +74,7 @@ body {
 .hero__subtitle {
   font-size: 14px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .hero__actions {
@@ -102,13 +105,14 @@ body {
 }
 
 .is-auth .main-grid {
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1.35fr 0.65fr;
 }
 
 .left-stack {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 }
 
 .hero--compact {
@@ -122,8 +126,8 @@ body {
 }
 
 .results-panel pre {
-  min-height: 420px;
-  max-height: 520px;
+  min-height: 260px;
+  max-height: 420px;
   flex: 1;
 }
 .results-panel pre {
