@@ -21,7 +21,8 @@ from db import (
     update_daily_runs,
     create_user,
 )
-from auth import generate_salt, hash_password
+import hashlib
+import secrets
 
 CHANNEL_RE = re.compile(
     r"(?:https?://t\.me/(?:s/)?|@)?(?P<user>[A-Za-z0-9_]{4,})", re.IGNORECASE
@@ -130,8 +131,10 @@ def _ensure_guest_user():
     user = get_user_by_email(GUEST_EMAIL)
     if user:
         return
-    salt = generate_salt()
-    password_hash = hash_password("guest", salt)
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.pbkdf2_hmac(
+        "sha256", b"guest", salt.encode("utf-8"), 200_000
+    ).hex()
     create_user(GUEST_EMAIL, password_hash, salt)
 
 
