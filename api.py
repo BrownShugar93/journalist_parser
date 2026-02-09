@@ -69,6 +69,7 @@ app.add_middleware(
 class SearchRequest(BaseModel):
     channels: List[str]
     keywords: List[str]
+    exclude_keywords: Optional[List[str]] = None
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
     videos_only: bool = True
@@ -187,6 +188,22 @@ def _normalize_keywords(keywords: List[str]) -> List[str]:
     return uniq
 
 
+def _normalize_exclude(keywords: Optional[List[str]]) -> List[str]:
+    if not keywords:
+        return []
+    return _normalize_keywords(keywords)
+
+
+def _text_has_excludes(text: str, excludes: List[str]) -> bool:
+    if not excludes:
+        return False
+    hay = (text or "").lower()
+    for w in excludes:
+        if w.lower() in hay:
+            return True
+    return False
+
+
 def _normalize_text_for_dedup(text: str) -> str:
     t = (text or "").lower()
     t = re.sub(r"\s+", " ", t).strip()
@@ -244,6 +261,7 @@ async def _fetch_text_by_link(client: TelegramClient, link: str) -> str:
 async def _search_videos_and_texts(
     channels: List[str],
     keywords: List[str],
+    exclude_keywords: List[str],
     start: datetime,
     end: datetime,
     videos_only: bool,
@@ -283,6 +301,9 @@ async def _search_videos_and_texts(
                     if videos_only and (not _is_video(msg)):
                         continue
 
+                    if _text_has_excludes(msg.message or "", exclude_keywords):
+                        continue
+
                     link = f"https://t.me/{ch}/{msg.id}"
                     fp = _video_fingerprint(msg) or f"link:{link}"
                     if fp not in found:
@@ -307,6 +328,8 @@ async def _search_videos_and_texts(
                 text = await _fetch_text_by_link(client, link)
             except Exception:
                 text = ""
+            if _text_has_excludes(text or "", exclude_keywords):
+                continue
             rows.append((link, text))
             if progress_cb:
                 pct = 0.9 + (i / total_links) * 0.1
@@ -340,6 +363,8 @@ async def search(req: SearchRequest):
 
     channels = _normalize_channels(req.channels)
     keywords = _normalize_keywords(req.keywords)
+    excludes = _normalize_exclude(req.exclude_keywords)
+    excludes = _normalize_exclude(req.exclude_keywords)
 
     if not channels:
         raise HTTPException(status_code=400, detail="Нет каналов")
@@ -366,6 +391,7 @@ async def search(req: SearchRequest):
     links_only, rows = await _search_videos_and_texts(
         channels=channels,
         keywords=keywords,
+        exclude_keywords=excludes,
         start=start,
         end=end,
         videos_only=req.videos_only,
@@ -386,6 +412,7 @@ async def _run_job(job_id: str, req: SearchRequest):
     try:
         channels = _normalize_channels(req.channels)
         keywords = _normalize_keywords(req.keywords)
+        excludes = _normalize_exclude(req.exclude_keywords)
         start_d = _parse_date(req.start_date)
         end_d = _parse_date(req.end_date)
         start, end = _utc_window(start_d, end_d)
@@ -393,6 +420,7 @@ async def _run_job(job_id: str, req: SearchRequest):
         links_only, rows = await _search_videos_and_texts(
             channels=channels,
             keywords=keywords,
+            exclude_keywords=excludes,
             start=start,
             end=end,
             videos_only=req.videos_only,
@@ -450,6 +478,7 @@ async def start_search(req: SearchRequest):
         "today_str": today_str,
         "created_at": datetime.now(timezone.utc).timestamp(),
     }
+    req.exclude_keywords = excludes
     asyncio.create_task(_run_job(job_id, req))
     return StartSearchResponse(job_id=job_id)
 

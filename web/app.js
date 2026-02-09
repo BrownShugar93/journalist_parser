@@ -24,6 +24,7 @@ const els = {
   channelList: document.getElementById('channelList'),
   channels: document.getElementById('channels'),
   keywords: document.getElementById('keywords'),
+  excludeKeywords: document.getElementById('excludeKeywords'),
   startDate: document.getElementById('startDate'),
   endDate: document.getElementById('endDate'),
 };
@@ -132,8 +133,14 @@ function updateRunState() {
 
   const chCount = (els.channels.value || '').split(/\n/).map((s) => s.trim()).filter(Boolean).length;
   const kwCount = (els.keywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean).length;
+  const exCount = (els.excludeKeywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean).length;
   els.channelsSummary.textContent = chCount ? `Выбрано каналов: ${chCount}` : 'Не выбраны';
-  els.keywordsSummary.textContent = kwCount ? `Ключей: ${kwCount}` : 'Не выбраны';
+  if (kwCount || exCount) {
+    const exPart = exCount ? `, минус: ${exCount}` : '';
+    els.keywordsSummary.textContent = `Ключей: ${kwCount}${exPart}`;
+  } else {
+    els.keywordsSummary.textContent = 'Не выбраны';
+  }
   if (els.startDate.value && els.endDate.value) {
     els.datesSummary.textContent = `Период: ${els.startDate.value} → ${els.endDate.value}`;
   } else {
@@ -193,6 +200,7 @@ els.channels.addEventListener('input', () => {
 });
 
 els.keywords.addEventListener('input', updateRunState);
+els.excludeKeywords.addEventListener('input', updateRunState);
 els.startDate.addEventListener('change', updateRunState);
 els.endDate.addEventListener('change', updateRunState);
 
@@ -207,6 +215,7 @@ els.runBtn.addEventListener('click', async () => {
   const payload = {
     channels: (els.channels.value || '').split(/\n/).map((s) => s.trim()).filter(Boolean),
     keywords: (els.keywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
+    exclude_keywords: (els.excludeKeywords.value || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
     start_date: els.startDate.value,
     end_date: els.endDate.value,
     videos_only: els.videosOnly.classList.contains('is-active'),
