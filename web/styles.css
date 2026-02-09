@@ -79,6 +79,10 @@ body {
   align-items: start;
 }
 
+.results-panel {
+  margin-left: -12px;
+}
+
 .left-panel {
   display: flex;
   flex-direction: column;
