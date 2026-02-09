@@ -77,6 +77,10 @@ const channelLists = {
     'https://t.me/Warhronika',
     'https://t.me/btr80',
     'https://t.me/sashakots',
+    'https://t.me/NgP_raZVedka',
+    'https://t.me/periodu',
+    'https://t.me/alchemiedeslebens',
+    'https://t.me/texBPLA',
   ],
   news: [
     'https://t.me/rian_ru',
@@ -235,7 +239,10 @@ els.runBtn.addEventListener('click', async () => {
       if (data.done) {
         const links = data.links || [];
         const rows = data.rows || [];
-        els.linksOutput.textContent = links.length ? links.join('\\n') : 'Пока пусто.';
+        const cleaned = links
+          .map((l) => String(l).replace(/\\n|\\r/g, '').trim())
+          .filter(Boolean);
+        els.linksOutput.textContent = cleaned.length ? cleaned.join('\\n') : 'Пока пусто.';
         els.resultsPanel.classList.remove('hidden');
 
         els.downloadCsv.onclick = () => {
