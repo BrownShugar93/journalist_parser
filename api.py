@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Callable
+import difflib
 
 from dotenv import load_dotenv
 
@@ -34,6 +35,7 @@ MAX_KEYWORDS = 7
 MAX_DAYS_WINDOW = 60
 MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.05
+TEXT_DEDUP_RATIO = 0.95
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -185,6 +187,34 @@ def _normalize_keywords(keywords: List[str]) -> List[str]:
     return uniq
 
 
+def _normalize_text_for_dedup(text: str) -> str:
+    t = (text or "").lower()
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _dedup_by_text(rows: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    deduped: List[Tuple[str, str]] = []
+    seen_texts: List[str] = []
+    for link, text in rows:
+        norm = _normalize_text_for_dedup(text)
+        if not norm:
+            deduped.append((link, text))
+            continue
+        is_dup = False
+        for prev in seen_texts:
+            if prev == norm:
+                is_dup = True
+                break
+            if difflib.SequenceMatcher(None, prev, norm).ratio() >= TEXT_DEDUP_RATIO:
+                is_dup = True
+                break
+        if not is_dup:
+            seen_texts.append(norm)
+            deduped.append((link, text))
+    return deduped
+
+
 def _is_video(msg) -> bool:
     if getattr(msg, "video", None):
         return True
@@ -284,6 +314,8 @@ async def _search_videos_and_texts(
             if throttle > 0:
                 await asyncio.sleep(throttle)
 
+    rows = _dedup_by_text(rows)
+    links_only = [link for link, _ in rows]
     return links_only, rows
 
 
