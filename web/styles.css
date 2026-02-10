@@ -66,8 +66,8 @@ body {
   background: transparent;
   color: var(--label);
   border: none;
-  padding: 18px 40px;
-  font-size: 30px;
+  padding: 36px 80px;
+  font-size: 60px;
   font-family: inherit;
   cursor: pointer;
 }
@@ -75,12 +75,12 @@ body {
 .workspace {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
-  gap: 16px;
+  gap: 8px;
   align-items: start;
 }
 
 .results-panel {
-  margin-left: -12px;
+  transform: translateX(-24px);
 }
 
 .left-panel {
