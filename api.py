@@ -32,7 +32,7 @@ LINK_RE = re.compile(r"https?://t\.me/([^/]+)/(\d+)")
 
 MAX_CHANNELS = 100
 MAX_KEYWORDS = 7
-MAX_DAYS_WINDOW = 60
+MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.05
 TEXT_DEDUP_RATIO = 0.95
@@ -378,8 +378,7 @@ async def search(req: SearchRequest):
 
     start_d = _parse_date(req.start_date)
     end_d = _parse_date(req.end_date)
-    if (end_d - start_d).days > MAX_DAYS_WINDOW:
-        raise HTTPException(status_code=400, detail=f"Слишком широкий период (макс {MAX_DAYS_WINDOW} дней)")
+    # временный лимит по периоду отключен
 
     start, end = _utc_window(start_d, end_d)
 
@@ -458,8 +457,7 @@ async def start_search(req: SearchRequest):
         raise HTTPException(status_code=400, detail=f"Слишком много ключей (макс {MAX_KEYWORDS})")
     start_d = _parse_date(req.start_date)
     end_d = _parse_date(req.end_date)
-    if (end_d - start_d).days > MAX_DAYS_WINDOW:
-        raise HTTPException(status_code=400, detail=f"Слишком широкий период (макс {MAX_DAYS_WINDOW} дней)")
+    # временный лимит по периоду отключен
 
     today_str = datetime.now(timezone.utc).date().isoformat()
     _, daily_count = reset_daily_runs_if_needed(int(user["id"]), today_str)
