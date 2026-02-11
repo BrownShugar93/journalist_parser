@@ -105,6 +105,22 @@ const channelLists = {
     'https://t.me/ostorozhno_novosti',
     'https://t.me/dimsmirnov175',
   ],
+  chp_omsk: [
+    'https://t.me/chp_55',
+    'https://t.me/chpomsk',
+    'https://t.me/omsk_vk',
+    'https://t.me/omsk_signal',
+    'https://t.me/omskonlain',
+    'https://t.me/omsk_55reg',
+    'https://t.me/chp_omsk',
+  ],
+  chp_tyumen: [
+    'https://t.me/tumen_chp',
+    'https://t.me/smi_tyumen',
+    'https://t.me/chp_tyumen',
+    'https://t.me/tyumen_xxxx',
+    'https://t.me/dtpichptyumen',
+  ],
   custom: [],
 };
 
