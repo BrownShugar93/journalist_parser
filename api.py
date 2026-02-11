@@ -28,14 +28,14 @@ import secrets
 CHANNEL_RE = re.compile(
     r"(?:https?://t\.me/(?:s/)?|@)?(?P<user>[A-Za-z0-9_]{4,})", re.IGNORECASE
 )
-LINK_RE = re.compile(r"https?://t\.me/([^/]+)/(\d+)")
 
 MAX_CHANNELS = 100
-MAX_KEYWORDS = 0
 MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.05
 TEXT_DEDUP_RATIO = 0.95
+MAX_PARALLEL_CHANNELS = 4
+FUZZY_DEDUP_MAX_ROWS = 1500
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -115,6 +115,9 @@ def _cleanup_jobs():
     now = datetime.now(timezone.utc).timestamp()
     expired = []
     for job_id, job in JOBS.items():
+        # Never delete running jobs.
+        if not bool(job.get("done")):
+            continue
         created = float(job.get("created_at", now))
         if now - created > JOB_TTL_SECONDS:
             expired.append(job_id)
@@ -210,25 +213,59 @@ def _normalize_text_for_dedup(text: str) -> str:
     return t
 
 
-def _dedup_by_text(rows: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
-    deduped: List[Tuple[str, str]] = []
-    seen_texts: List[str] = []
+def _dedup_by_text(
+    rows: List[Tuple[str, str]], progress_cb: Optional[Callable[[float, str], None]] = None
+) -> List[Tuple[str, str]]:
+    # Fast exact dedup first (linear).
+    exact_seen: set[str] = set()
+    exact_rows: List[Tuple[str, str, str]] = []
     for link, text in rows:
         norm = _normalize_text_for_dedup(text)
         if not norm:
+            exact_rows.append((link, text, norm))
+            continue
+        if norm in exact_seen:
+            continue
+        exact_seen.add(norm)
+        exact_rows.append((link, text, norm))
+
+    # For large batches, skip expensive fuzzy pass to avoid long stalls.
+    if len(exact_rows) > FUZZY_DEDUP_MAX_ROWS:
+        if progress_cb:
+            progress_cb(1.0, "Дедуп: быстрый режим (точные совпадения)")
+        return [(link, text) for link, text, _ in exact_rows]
+
+    # Fuzzy dedup with candidate bucketing to reduce comparisons.
+    deduped: List[Tuple[str, str]] = []
+    buckets: Dict[str, List[str]] = {}
+    total = max(1, len(exact_rows))
+
+    for i, (link, text, norm) in enumerate(exact_rows, start=1):
+        if not norm:
             deduped.append((link, text))
             continue
+
+        key = norm[:24]
+        candidates = buckets.get(key, [])
         is_dup = False
-        for prev in seen_texts:
-            if prev == norm:
-                is_dup = True
-                break
+        for prev in candidates:
+            # Quick length gate before expensive ratio.
+            max_len = max(len(prev), len(norm))
+            if max_len == 0:
+                continue
+            if abs(len(prev) - len(norm)) / max_len > (1 - TEXT_DEDUP_RATIO):
+                continue
             if difflib.SequenceMatcher(None, prev, norm).ratio() >= TEXT_DEDUP_RATIO:
                 is_dup = True
                 break
+
         if not is_dup:
-            seen_texts.append(norm)
             deduped.append((link, text))
+            buckets.setdefault(key, []).append(norm)
+
+        if progress_cb and i % 200 == 0:
+            progress_cb(0.95 + (i / total) * 0.05, f"Дедуп: {i}/{total}")
+
     return deduped
 
 
@@ -248,14 +285,14 @@ def _video_fingerprint(msg) -> Optional[str]:
     return None
 
 
-async def _fetch_text_by_link(client: TelegramClient, link: str) -> str:
-    m = LINK_RE.search(link)
-    if not m:
-        return ""
-    username, msg_id = m.group(1), int(m.group(2))
-    entity = await client.get_entity(username)
-    msg = await client.get_messages(entity, ids=msg_id)
-    return (msg.message or "").strip() if msg else ""
+def _contains_any_keyword(text: str, keywords: List[str]) -> bool:
+    if not keywords:
+        return False
+    hay = (text or "").lower()
+    for kw in keywords:
+        if kw.lower() in hay:
+            return True
+    return False
 
 
 async def _search_videos_and_texts(
@@ -268,77 +305,74 @@ async def _search_videos_and_texts(
     throttle: float,
     progress_cb: Optional[Callable[[float, str], None]] = None,
 ) -> Tuple[List[str], List[Tuple[str, str]]]:
-    found: Dict[str, Tuple[datetime, str, str, str]] = {}
+    found: Dict[str, Tuple[datetime, str, str]] = {}
     end_inclusive = end + timedelta(seconds=1)
-
     session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
+    sem = asyncio.Semaphore(max(1, min(MAX_PARALLEL_CHANNELS, len(channels) or 1)))
+    found_lock = asyncio.Lock()
+    done_channels = 0
+    total_channels = max(1, len(channels))
 
-    async with TelegramClient(session, int(API_ID), API_HASH) as client:
-        total_steps = max(1, len(channels) * max(1, len(keywords)))
-        done_steps = 0
-        for ch in channels:
+    async def process_channel(client: TelegramClient, ch: str):
+        nonlocal done_channels
+        async with sem:
             try:
                 entity = await client.get_entity(ch)
             except Exception:
-                continue
-
-            for kw in keywords:
                 if progress_cb:
-                    progress_cb(min(0.9, done_steps / total_steps * 0.9), f"@{ch} — «{kw}»")
-                async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
-                    if not msg or not msg.date:
-                        continue
+                    done_channels += 1
+                    progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — пропуск")
+                return
 
-                    msg_date = msg.date
-                    if msg_date.tzinfo is None:
-                        msg_date = msg_date.replace(tzinfo=timezone.utc)
+            if progress_cb:
+                progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — сканирую")
 
-                    if msg_date > end:
-                        continue
-                    if msg_date < start:
-                        break
+            async for msg in client.iter_messages(entity, offset_date=end_inclusive):
+                if not msg or not msg.date:
+                    continue
 
-                    if videos_only and (not _is_video(msg)):
-                        continue
+                msg_date = msg.date
+                if msg_date.tzinfo is None:
+                    msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                    if _text_has_excludes(msg.message or "", exclude_keywords):
-                        continue
+                if msg_date > end:
+                    continue
+                if msg_date < start:
+                    break
 
-                    link = f"https://t.me/{ch}/{msg.id}"
-                    fp = _video_fingerprint(msg) or f"link:{link}"
+                if videos_only and (not _is_video(msg)):
+                    continue
+
+                text = (msg.message or "").strip()
+                if not _contains_any_keyword(text, keywords):
+                    continue
+                if _text_has_excludes(text, exclude_keywords):
+                    continue
+
+                link = f"https://t.me/{ch}/{msg.id}"
+                fp = _video_fingerprint(msg) or f"link:{link}"
+                async with found_lock:
                     if fp not in found:
-                        found[fp] = (msg_date, ch, kw, link)
+                        found[fp] = (msg_date, link, text)
 
-                    if throttle > 0:
-                        await asyncio.sleep(throttle)
-                done_steps += 1
-                if progress_cb:
-                    progress_cb(min(0.9, done_steps / total_steps * 0.9), f"@{ch} — «{kw}»")
+                if throttle > 0:
+                    await asyncio.sleep(throttle)
 
-    final = sorted(found.values(), key=lambda x: x[0])
-    links_only = [link for _, _, _, link in final]
-
-    rows: List[Tuple[str, str]] = []
-    session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
+            done_channels += 1
+            if progress_cb:
+                progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — готово")
 
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
-        total_links = max(1, len(links_only))
-        for i, link in enumerate(links_only, start=1):
-            try:
-                text = await _fetch_text_by_link(client, link)
-            except Exception:
-                text = ""
-            if _text_has_excludes(text or "", exclude_keywords):
-                continue
-            rows.append((link, text))
-            if progress_cb:
-                pct = 0.9 + (i / total_links) * 0.1
-                progress_cb(min(1.0, pct), f"Тексты: {i}/{len(links_only)}")
-            if throttle > 0:
-                await asyncio.sleep(throttle)
+        await asyncio.gather(*(process_channel(client, ch) for ch in channels))
 
-    rows = _dedup_by_text(rows)
+    final = sorted(found.values(), key=lambda x: x[0])
+    rows = [(link, text) for _, link, text in final]
+    if progress_cb:
+        progress_cb(0.95, "Дедуп по тексту...")
+    rows = _dedup_by_text(rows, progress_cb=progress_cb)
     links_only = [link for link, _ in rows]
+    if progress_cb:
+        progress_cb(1.0, "Готово")
     return links_only, rows
 
 
@@ -363,7 +397,6 @@ async def search(req: SearchRequest):
 
     channels = _normalize_channels(req.channels)
     keywords = _normalize_keywords(req.keywords)
-    excludes = _normalize_exclude(req.exclude_keywords)
     excludes = _normalize_exclude(req.exclude_keywords)
 
     if not channels:
@@ -404,8 +437,11 @@ async def search(req: SearchRequest):
 
 async def _run_job(job_id: str, req: SearchRequest):
     def progress_cb(pct: float, msg: str):
-        JOBS[job_id]["progress"] = pct * 100
-        JOBS[job_id]["log"] = msg
+        job = JOBS.get(job_id)
+        if not job:
+            return
+        job["progress"] = pct * 100
+        job["log"] = msg
 
     try:
         channels = _normalize_channels(req.channels)
@@ -425,19 +461,24 @@ async def _run_job(job_id: str, req: SearchRequest):
             throttle=THROTTLE_SECONDS,
             progress_cb=progress_cb,
         )
-        JOBS[job_id]["links"] = links_only
-        JOBS[job_id]["rows"] = rows
-        JOBS[job_id]["done"] = True
-        JOBS[job_id]["progress"] = 100.0
-        JOBS[job_id]["log"] = "Готово"
+        job = JOBS.get(job_id)
+        if not job:
+            return
+        job["links"] = links_only
+        job["rows"] = rows
+        job["done"] = True
+        job["progress"] = 100.0
+        job["log"] = "Готово"
         if links_only:
-            user_id = int(JOBS[job_id]["user_id"])
-            today_str = str(JOBS[job_id]["today_str"])
+            user_id = int(job["user_id"])
+            today_str = str(job["today_str"])
             _, daily_count = reset_daily_runs_if_needed(user_id, today_str)
             update_daily_runs(user_id, today_str, daily_count + 1)
     except Exception as e:
-        JOBS[job_id]["done"] = True
-        JOBS[job_id]["error"] = str(e)
+        job = JOBS.get(job_id)
+        if job:
+            job["done"] = True
+            job["error"] = str(e)
 
 
 @app.post("/search/start", response_model=StartSearchResponse)
