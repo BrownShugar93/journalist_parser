@@ -31,7 +31,7 @@ CHANNEL_RE = re.compile(
 LINK_RE = re.compile(r"https?://t\.me/([^/]+)/(\d+)")
 
 MAX_CHANNELS = 100
-MAX_KEYWORDS = 7
+MAX_KEYWORDS = 0
 MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.05
@@ -373,8 +373,7 @@ async def search(req: SearchRequest):
 
     if len(channels) > MAX_CHANNELS:
         raise HTTPException(status_code=400, detail=f"Слишком много каналов (макс {MAX_CHANNELS})")
-    if len(keywords) > MAX_KEYWORDS:
-        raise HTTPException(status_code=400, detail=f"Слишком много ключей (макс {MAX_KEYWORDS})")
+    # лимит по количеству ключевых слов отключен
 
     start_d = _parse_date(req.start_date)
     end_d = _parse_date(req.end_date)
@@ -454,8 +453,7 @@ async def start_search(req: SearchRequest):
         raise HTTPException(status_code=400, detail="Нет ключевых слов")
     if len(channels) > MAX_CHANNELS:
         raise HTTPException(status_code=400, detail=f"Слишком много каналов (макс {MAX_CHANNELS})")
-    if len(keywords) > MAX_KEYWORDS:
-        raise HTTPException(status_code=400, detail=f"Слишком много ключей (макс {MAX_KEYWORDS})")
+    # лимит по количеству ключевых слов отключен
     start_d = _parse_date(req.start_date)
     end_d = _parse_date(req.end_date)
     # временный лимит по периоду отключен
