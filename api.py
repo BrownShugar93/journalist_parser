@@ -447,6 +447,7 @@ async def start_search(req: SearchRequest):
 
     channels = _normalize_channels(req.channels)
     keywords = _normalize_keywords(req.keywords)
+    excludes = _normalize_exclude(req.exclude_keywords)
     if not channels:
         raise HTTPException(status_code=400, detail="Нет каналов")
     if not keywords:
