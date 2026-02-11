@@ -34,6 +34,9 @@ const store = {
   set apiUrl(v) { if (v) localStorage.setItem('apiUrl', v); },
 };
 
+let activeRunSeq = 0;
+const MAX_STATUS_WAIT_MS = 12 * 60 * 1000;
+
 const channelLists = {
   voenkory: [
     'https://t.me/dontstopwar',
@@ -222,6 +225,8 @@ els.endDate.addEventListener('change', updateRunState);
 
 els.runBtn.addEventListener('click', async () => {
   if (els.runBtn.disabled) return;
+  activeRunSeq += 1;
+  const runSeq = activeRunSeq;
   els.resultsPanel.classList.add('hidden');
   els.linksOutput.textContent = '';
   els.progressWrap.classList.remove('hidden');
@@ -249,8 +254,15 @@ els.runBtn.addEventListener('click', async () => {
     const { job_id } = await startRes.json();
     if (!job_id) throw new Error('Не получил job_id');
 
+    const startedAt = Date.now();
     let done = false;
     while (!done) {
+      if (runSeq !== activeRunSeq) {
+        throw new Error('Запуск отменён новым запросом');
+      }
+      if (Date.now() - startedAt > MAX_STATUS_WAIT_MS) {
+        throw new Error('Таймаут ожидания результата. Повтори запуск.');
+      }
       const st = await apiFetch(`/search/status/${job_id}`);
       if (st.status !== 200) {
         const data = await st.json().catch(() => ({}));
@@ -298,8 +310,9 @@ els.runBtn.addEventListener('click', async () => {
       }
     }
   } catch (e) {
-    log(e.message);
+    log(e?.message || String(e));
   } finally {
+    if (runSeq !== activeRunSeq) return;
     els.progressBar.style.width = '100%';
     setTimeout(() => {
       els.progressWrap.classList.add('hidden');
