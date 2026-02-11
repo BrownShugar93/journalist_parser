@@ -32,7 +32,7 @@ CHANNEL_RE = re.compile(
 MAX_CHANNELS = 100
 MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
-THROTTLE_SECONDS = 0.05
+THROTTLE_SECONDS = 0.0
 TEXT_DEDUP_RATIO = 0.95
 MAX_PARALLEL_CHANNELS = 4
 FUZZY_DEDUP_MAX_ROWS = 1500
@@ -285,16 +285,6 @@ def _video_fingerprint(msg) -> Optional[str]:
     return None
 
 
-def _contains_any_keyword(text: str, keywords: List[str]) -> bool:
-    if not keywords:
-        return False
-    hay = (text or "").lower()
-    for kw in keywords:
-        if kw.lower() in hay:
-            return True
-    return False
-
-
 async def _search_videos_and_texts(
     channels: List[str],
     keywords: List[str],
@@ -324,39 +314,38 @@ async def _search_videos_and_texts(
                     progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — пропуск")
                 return
 
-            if progress_cb:
-                progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — сканирую")
+            for kw in keywords:
+                if progress_cb:
+                    progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — «{kw}»")
 
-            async for msg in client.iter_messages(entity, offset_date=end_inclusive):
-                if not msg or not msg.date:
-                    continue
+                async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
+                    if not msg or not msg.date:
+                        continue
 
-                msg_date = msg.date
-                if msg_date.tzinfo is None:
-                    msg_date = msg_date.replace(tzinfo=timezone.utc)
+                    msg_date = msg.date
+                    if msg_date.tzinfo is None:
+                        msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                if msg_date > end:
-                    continue
-                if msg_date < start:
-                    break
+                    if msg_date > end:
+                        continue
+                    if msg_date < start:
+                        break
 
-                if videos_only and (not _is_video(msg)):
-                    continue
+                    if videos_only and (not _is_video(msg)):
+                        continue
 
-                text = (msg.message or "").strip()
-                if not _contains_any_keyword(text, keywords):
-                    continue
-                if _text_has_excludes(text, exclude_keywords):
-                    continue
+                    text = (msg.message or "").strip()
+                    if _text_has_excludes(text, exclude_keywords):
+                        continue
 
-                link = f"https://t.me/{ch}/{msg.id}"
-                fp = _video_fingerprint(msg) or f"link:{link}"
-                async with found_lock:
-                    if fp not in found:
-                        found[fp] = (msg_date, link, text)
+                    link = f"https://t.me/{ch}/{msg.id}"
+                    fp = _video_fingerprint(msg) or f"link:{link}"
+                    async with found_lock:
+                        if fp not in found:
+                            found[fp] = (msg_date, link, text)
 
-                if throttle > 0:
-                    await asyncio.sleep(throttle)
+                    if throttle > 0:
+                        await asyncio.sleep(throttle)
 
             done_channels += 1
             if progress_cb:
