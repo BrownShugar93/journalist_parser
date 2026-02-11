@@ -265,7 +265,8 @@ els.runBtn.addEventListener('click', async () => {
         const links = data.links || [];
         const rows = data.rows || [];
         const cleaned = links
-          .map((l) => String(l).replace(/\\n|\\r/g, '').trim())
+          .flatMap((l) => String(l).split(/[\\r\\n]+/))
+          .map((s) => s.trim())
           .filter(Boolean);
         els.linksOutput.textContent = cleaned.length ? cleaned.join('\\n') : 'Пока пусто.';
         els.resultsPanel.classList.remove('hidden');
