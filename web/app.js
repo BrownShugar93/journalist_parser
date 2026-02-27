@@ -247,10 +247,10 @@ async function apiFetch(path, options = {}) {
 }
 
 function csvBlob(rows) {
-  const header = 'link,text\n';
-  const lines = rows.map(([link, text]) => {
+  const header = 'published_at,link,text\n';
+  const lines = rows.map(([publishedAt, link, text]) => {
     const esc = (s) => '"' + String(s).replace(/"/g, '""') + '"';
-    return `${esc(link)},${esc(text)}`;
+    return `${esc(publishedAt)},${esc(link)},${esc(text)}`;
   });
   return new Blob([header + lines.join('\n') + '\n'], { type: 'text/csv' });
 }

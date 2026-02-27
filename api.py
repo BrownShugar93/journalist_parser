@@ -77,7 +77,7 @@ class SearchRequest(BaseModel):
 
 class SearchResponse(BaseModel):
     links: List[str]
-    rows: List[Tuple[str, str]]
+    rows: List[Tuple[str, str, str]]
 
 
 class StartSearchResponse(BaseModel):
@@ -91,7 +91,7 @@ class SearchStatusResponse(BaseModel):
     log: Optional[str]
     error: Optional[str]
     links: Optional[List[str]] = None
-    rows: Optional[List[Tuple[str, str]]] = None
+    rows: Optional[List[Tuple[str, str, str]]] = None
 
 
 
@@ -214,35 +214,35 @@ def _normalize_text_for_dedup(text: str) -> str:
 
 
 def _dedup_by_text(
-    rows: List[Tuple[str, str]], progress_cb: Optional[Callable[[float, str], None]] = None
-) -> List[Tuple[str, str]]:
+    rows: List[Tuple[str, str, str]], progress_cb: Optional[Callable[[float, str], None]] = None
+) -> List[Tuple[str, str, str]]:
     # Fast exact dedup first (linear).
     exact_seen: set[str] = set()
-    exact_rows: List[Tuple[str, str, str]] = []
-    for link, text in rows:
+    exact_rows: List[Tuple[str, str, str, str]] = []
+    for published_at, link, text in rows:
         norm = _normalize_text_for_dedup(text)
         if not norm:
-            exact_rows.append((link, text, norm))
+            exact_rows.append((published_at, link, text, norm))
             continue
         if norm in exact_seen:
             continue
         exact_seen.add(norm)
-        exact_rows.append((link, text, norm))
+        exact_rows.append((published_at, link, text, norm))
 
     # For large batches, skip expensive fuzzy pass to avoid long stalls.
     if len(exact_rows) > FUZZY_DEDUP_MAX_ROWS:
         if progress_cb:
             progress_cb(1.0, "Дедуп: быстрый режим (точные совпадения)")
-        return [(link, text) for link, text, _ in exact_rows]
+        return [(published_at, link, text) for published_at, link, text, _ in exact_rows]
 
     # Fuzzy dedup with candidate bucketing to reduce comparisons.
-    deduped: List[Tuple[str, str]] = []
+    deduped: List[Tuple[str, str, str]] = []
     buckets: Dict[str, List[str]] = {}
     total = max(1, len(exact_rows))
 
-    for i, (link, text, norm) in enumerate(exact_rows, start=1):
+    for i, (published_at, link, text, norm) in enumerate(exact_rows, start=1):
         if not norm:
-            deduped.append((link, text))
+            deduped.append((published_at, link, text))
             continue
 
         key = norm[:24]
@@ -260,7 +260,7 @@ def _dedup_by_text(
                 break
 
         if not is_dup:
-            deduped.append((link, text))
+            deduped.append((published_at, link, text))
             buckets.setdefault(key, []).append(norm)
 
         if progress_cb and i % 200 == 0:
@@ -270,11 +270,17 @@ def _dedup_by_text(
 
 
 def _is_video(msg) -> bool:
-    if getattr(msg, "video", None):
+    # Prefer strict checks to avoid false positives in mixed/preview messages.
+    if getattr(msg, "video_note", None):
         return True
     doc = getattr(msg, "document", None)
-    if doc and getattr(doc, "mime_type", "") and doc.mime_type.startswith("video/"):
-        return True
+    if doc:
+        mime_type = getattr(doc, "mime_type", "") or ""
+        if mime_type.startswith("video/"):
+            return True
+        for attr in getattr(doc, "attributes", []) or []:
+            if attr.__class__.__name__ == "DocumentAttributeVideo":
+                return True
     return False
 
 
@@ -294,7 +300,7 @@ async def _search_videos_and_texts(
     videos_only: bool,
     throttle: float,
     progress_cb: Optional[Callable[[float, str], None]] = None,
-) -> Tuple[List[str], List[Tuple[str, str]]]:
+) -> Tuple[List[str], List[Tuple[str, str, str]]]:
     found: Dict[str, Tuple[datetime, str, str]] = {}
     end_inclusive = end + timedelta(seconds=1)
     session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
@@ -354,12 +360,12 @@ async def _search_videos_and_texts(
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
         await asyncio.gather(*(process_channel(client, ch) for ch in channels))
 
-    final = sorted(found.values(), key=lambda x: x[0])
-    rows = [(link, text) for _, link, text in final]
+    final = sorted(found.values(), key=lambda x: x[0], reverse=True)
+    rows = [(dt.isoformat(), link, text) for dt, link, text in final]
     if progress_cb:
         progress_cb(0.95, "Дедуп по тексту...")
     rows = _dedup_by_text(rows, progress_cb=progress_cb)
-    links_only = [link for link, _ in rows]
+    links_only = [link for _, link, _ in rows]
     if progress_cb:
         progress_cb(1.0, "Готово")
     return links_only, rows
