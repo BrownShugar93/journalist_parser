@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 .venv/
 venv/
+*.session
+.tg_string_session_generated

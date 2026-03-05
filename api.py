@@ -125,8 +125,9 @@ def _cleanup_jobs():
         JOBS.pop(job_id, None)
 
     if len(JOBS) > JOB_MAX_ITEMS:
+        done_jobs = [(jid, job) for jid, job in JOBS.items() if bool(job.get("done"))]
         sorted_jobs = sorted(
-            JOBS.items(),
+            done_jobs,
             key=lambda kv: float(kv[1].get("created_at", now)),
         )
         for job_id, _ in sorted_jobs[: max(0, len(JOBS) - JOB_MAX_ITEMS)]:
@@ -203,6 +204,22 @@ def _text_has_excludes(text: str, excludes: List[str]) -> bool:
     hay = (text or "").lower()
     for w in excludes:
         if w.lower() in hay:
+            return True
+    return False
+
+
+def _text_has_keyword(text: str, keywords: List[str]) -> bool:
+    if not keywords:
+        return False
+    hay = (text or "").lower()
+    # Fast path.
+    for w in keywords:
+        if w in hay:
+            return True
+    # Boundary-friendly path for punctuation/space separated words.
+    for w in keywords:
+        pattern = r"(?<!\w)" + re.escape(w) + r"(?!\w)"
+        if re.search(pattern, hay):
             return True
     return False
 
@@ -310,12 +327,12 @@ async def _search_videos_and_texts(
     total_channels = max(1, len(channels))
     keywords_lc = [k.lower() for k in keywords]
     excludes_lc = [k.lower() for k in exclude_keywords]
-    scanned_total = 0
+    matched_total = 0
     skipped_channels = 0
     skipped_errors: List[str] = []
 
     async def process_channel(client: TelegramClient, ch: str):
-        nonlocal done_channels, scanned_total, skipped_channels
+        nonlocal done_channels, matched_total, skipped_channels
         async with sem:
             try:
                 entity = await client.get_entity(ch)
@@ -346,11 +363,9 @@ async def _search_videos_and_texts(
                     continue
 
                 text = (msg.message or "").strip()
-                text_lc = text.lower()
-
-                if keywords_lc and not any(k in text_lc for k in keywords_lc):
+                if keywords_lc and not _text_has_keyword(text, keywords_lc):
                     continue
-                if excludes_lc and any(k in text_lc for k in excludes_lc):
+                if _text_has_excludes(text, excludes_lc):
                     continue
 
                 link = f"https://t.me/{ch}/{msg.id}"
@@ -358,7 +373,7 @@ async def _search_videos_and_texts(
                 async with found_lock:
                     if fp not in found:
                         found[fp] = (msg_date, link, text)
-                scanned_total += 1
+                        matched_total += 1
 
                 scanned += 1
                 if progress_cb and scanned % 200 == 0:
@@ -374,10 +389,48 @@ async def _search_videos_and_texts(
             if progress_cb:
                 progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — готово")
 
+    async def fallback_channel_search(client: TelegramClient, ch: str):
+        try:
+            entity = await client.get_entity(ch)
+        except Exception:
+            return
+        for kw in keywords_lc:
+            async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
+                if not msg or not msg.date:
+                    continue
+
+                msg_date = msg.date
+                if msg_date.tzinfo is None:
+                    msg_date = msg_date.replace(tzinfo=timezone.utc)
+
+                if msg_date > end:
+                    continue
+                if msg_date < start:
+                    break
+
+                if videos_only and (not _is_video(msg)):
+                    continue
+
+                text = (msg.message or "").strip()
+                if _text_has_excludes(text, excludes_lc):
+                    continue
+
+                link = f"https://t.me/{ch}/{msg.id}"
+                fp = _video_fingerprint(msg) or f"link:{link}"
+                async with found_lock:
+                    if fp not in found:
+                        found[fp] = (msg_date, link, text)
+                if throttle > 0:
+                    await asyncio.sleep(throttle)
+
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
         if not await client.is_user_authorized():
             raise RuntimeError("Telegram-сессия не авторизована. Обновите TG_STRING_SESSION или сессию.")
         await asyncio.gather(*(process_channel(client, ch) for ch in channels))
+        if not found:
+            if progress_cb:
+                progress_cb(0.6, "Первый проход пустой, пробую fallback-поиск...")
+            await asyncio.gather(*(fallback_channel_search(client, ch) for ch in channels))
 
     if skipped_channels >= total_channels:
         details = "; ".join(skipped_errors) if skipped_errors else "ошибки get_entity"
@@ -386,7 +439,10 @@ async def _search_videos_and_texts(
     final = sorted(found.values(), key=lambda x: x[0], reverse=True)
     rows = [(dt.isoformat(), link, text) for dt, link, text in final]
     if progress_cb:
-        progress_cb(0.95, f"Дедуп по тексту... найдено: {len(rows)}, пропусков каналов: {skipped_channels}")
+        progress_cb(
+            0.95,
+            f"Дедуп по тексту... найдено: {len(rows)}, совпадений: {matched_total}, пропусков каналов: {skipped_channels}",
+        )
     rows = _dedup_by_text(rows, progress_cb=progress_cb)
     links_only = [link for _, link, _ in rows]
     if progress_cb:
