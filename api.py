@@ -33,9 +33,9 @@ CHANNEL_RE = re.compile(
 MAX_CHANNELS = 100
 MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
-THROTTLE_SECONDS = 0.0
+THROTTLE_SECONDS = 0.03
 TEXT_DEDUP_RATIO = 0.95
-MAX_PARALLEL_CHANNELS = 2
+MAX_PARALLEL_CHANNELS = 1
 FUZZY_DEDUP_MAX_ROWS = 1500
 MAX_FLOOD_WAIT_SECONDS = 180
 MAX_FLOOD_RETRIES = 2
@@ -57,6 +57,7 @@ APP_VERSION = "2026-02-06-free-access"
 JOBS: Dict[str, Dict[str, object]] = {}
 JOB_TTL_SECONDS = 60 * 30
 JOB_MAX_ITEMS = 200
+ENTITY_CACHE: Dict[str, object] = {}
 
 origins = ["*"] if CORS_ORIGINS.strip() == "*" else [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
@@ -180,6 +181,20 @@ def _sanitize_string_session(raw: str) -> str:
     # Remove spaces if any slipped in.
     s = re.sub(r"\s+", "", s)
     return s
+
+
+async def _build_dialog_entity_index(client: TelegramClient) -> Dict[str, object]:
+    """
+    Build fast username -> entity map from local dialogs cache.
+    This avoids mass username resolving requests that quickly trigger FloodWait.
+    """
+    idx: Dict[str, object] = {}
+    async for d in client.iter_dialogs(limit=500):
+        ent = getattr(d, "entity", None)
+        username = (getattr(ent, "username", None) or "").strip()
+        if username:
+            idx[username.lower()] = ent
+    return idx
 
 
 def _normalize_channels(channels: List[str]) -> List[str]:
@@ -357,20 +372,28 @@ async def _search_videos_and_texts(
     excludes_lc = [k.lower() for k in exclude_keywords]
     matched_total = 0
     skipped_channels = 0
+    flood_skipped = 0
     skipped_errors: List[str] = []
+    dialog_entity_index: Dict[str, object] = {}
 
     async def process_channel(client: TelegramClient, ch: str):
-        nonlocal done_channels, matched_total, skipped_channels
+        nonlocal done_channels, matched_total, skipped_channels, flood_skipped
         async with sem:
             entity = None
+            ch_key = ch.lower()
+            entity = ENTITY_CACHE.get(ch_key) or dialog_entity_index.get(ch_key)
             for attempt in range(MAX_FLOOD_RETRIES + 1):
+                if entity is not None:
+                    break
                 try:
                     entity = await client.get_entity(ch)
+                    ENTITY_CACHE[ch_key] = entity
                     break
                 except FloodWaitError as e:
                     wait_s = int(getattr(e, "seconds", 0) or 0)
                     if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
                         skipped_channels += 1
+                        flood_skipped += 1
                         if len(skipped_errors) < 5:
                             skipped_errors.append(f"@{ch}: FloodWaitError({wait_s}s)")
                         if progress_cb:
@@ -462,9 +485,14 @@ async def _search_videos_and_texts(
 
     async def fallback_channel_search(client: TelegramClient, ch: str):
         entity = None
+        ch_key = ch.lower()
+        entity = ENTITY_CACHE.get(ch_key) or dialog_entity_index.get(ch_key)
         for attempt in range(MAX_FLOOD_RETRIES + 1):
+            if entity is not None:
+                break
             try:
                 entity = await client.get_entity(ch)
+                ENTITY_CACHE[ch_key] = entity
                 break
             except FloodWaitError as e:
                 wait_s = int(getattr(e, "seconds", 0) or 0)
@@ -513,6 +541,7 @@ async def _search_videos_and_texts(
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
         if not await client.is_user_authorized():
             raise RuntimeError("Telegram-сессия не авторизована. Обновите TG_STRING_SESSION или сессию.")
+        dialog_entity_index = await _build_dialog_entity_index(client)
         await asyncio.gather(*(process_channel(client, ch) for ch in channels))
         if not found:
             if progress_cb:
@@ -522,6 +551,11 @@ async def _search_videos_and_texts(
     if skipped_channels >= total_channels:
         details = "; ".join(skipped_errors) if skipped_errors else "ошибки get_entity"
         raise RuntimeError(f"Не удалось открыть ни один канал ({skipped_channels}/{total_channels}): {details}")
+    if not found and flood_skipped > 0:
+        raise RuntimeError(
+            f"Telegram временно ограничил доступ (FloodWait) по {flood_skipped} каналам. "
+            "Подождите 10-20 минут и повторите."
+        )
 
     final = sorted(found.values(), key=lambda x: x[0], reverse=True)
     rows = [(dt.isoformat(), link, text) for dt, link, text in final]
