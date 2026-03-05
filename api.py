@@ -160,6 +160,25 @@ def _utc_window(start_d: date, end_d: date) -> Tuple[datetime, datetime]:
     return start, end
 
 
+def _sanitize_string_session(raw: str) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    # Common copy/paste artifacts from terminal/docs.
+    s = s.replace("\u200b", "").replace("\ufeff", "")
+    s = s.strip("\"'`")
+    # Keep only the first line that looks like a session token.
+    parts = [p.strip() for p in re.split(r"[\r\n]+", s) if p.strip()]
+    if parts:
+        for p in parts:
+            if p.startswith("1") and re.fullmatch(r"[A-Za-z0-9_\-=]+", p):
+                return p
+        s = parts[-1]
+    # Remove spaces if any slipped in.
+    s = re.sub(r"\s+", "", s)
+    return s
+
+
 def _normalize_channels(channels: List[str]) -> List[str]:
     out: List[str] = []
     for raw in channels:
@@ -320,7 +339,13 @@ async def _search_videos_and_texts(
 ) -> Tuple[List[str], List[Tuple[str, str, str]]]:
     found: Dict[str, Tuple[datetime, str, str]] = {}
     end_inclusive = end + timedelta(seconds=1)
-    session = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else SESSION_NAME
+    string_session = _sanitize_string_session(TG_STRING_SESSION)
+    if string_session:
+        if not re.fullmatch(r"[A-Za-z0-9_\-=]+", string_session):
+            raise RuntimeError("TG_STRING_SESSION содержит недопустимые символы. Вставьте только строку сессии.")
+        session = StringSession(string_session)
+    else:
+        session = SESSION_NAME
     sem = asyncio.Semaphore(max(1, min(MAX_PARALLEL_CHANNELS, len(channels) or 1)))
     found_lock = asyncio.Lock()
     done_channels = 0
