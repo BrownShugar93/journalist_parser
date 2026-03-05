@@ -567,7 +567,10 @@ async def _search_videos_and_texts(
     rows = _dedup_by_text(rows, progress_cb=progress_cb)
     links_only = [link for _, link, _ in rows]
     if progress_cb:
-        progress_cb(1.0, "Готово")
+        progress_cb(
+            1.0,
+            f"Готово. Каналов пропущено из-за FloodWait: {flood_skipped}",
+        )
     return links_only, rows
 
 
@@ -663,7 +666,8 @@ async def _run_job(job_id: str, req: SearchRequest):
         job["rows"] = rows
         job["done"] = True
         job["progress"] = 100.0
-        job["log"] = "Готово"
+        if not job.get("log"):
+            job["log"] = "Готово"
         if links_only:
             user_id = int(job["user_id"])
             today_str = str(job["today_str"])
