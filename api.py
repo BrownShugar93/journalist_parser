@@ -1,4 +1,5 @@
 import os
+import math
 import re
 import asyncio
 import uuid
@@ -373,11 +374,12 @@ async def _search_videos_and_texts(
     matched_total = 0
     skipped_channels = 0
     flood_skipped = 0
+    max_flood_wait_seconds = 0
     skipped_errors: List[str] = []
     dialog_entity_index: Dict[str, object] = {}
 
     async def process_channel(client: TelegramClient, ch: str):
-        nonlocal done_channels, matched_total, skipped_channels, flood_skipped
+        nonlocal done_channels, matched_total, skipped_channels, flood_skipped, max_flood_wait_seconds
         async with sem:
             entity = None
             ch_key = ch.lower()
@@ -391,6 +393,8 @@ async def _search_videos_and_texts(
                     break
                 except FloodWaitError as e:
                     wait_s = int(getattr(e, "seconds", 0) or 0)
+                    if wait_s > max_flood_wait_seconds:
+                        max_flood_wait_seconds = wait_s
                     if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
                         skipped_channels += 1
                         flood_skipped += 1
@@ -462,6 +466,8 @@ async def _search_videos_and_texts(
                     break
                 except FloodWaitError as e:
                     wait_s = int(getattr(e, "seconds", 0) or 0)
+                    if wait_s > max_flood_wait_seconds:
+                        max_flood_wait_seconds = wait_s
                     if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
                         skipped_channels += 1
                         if len(skipped_errors) < 5:
@@ -484,6 +490,7 @@ async def _search_videos_and_texts(
                 progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — готово")
 
     async def fallback_channel_search(client: TelegramClient, ch: str):
+        nonlocal max_flood_wait_seconds
         entity = None
         ch_key = ch.lower()
         entity = ENTITY_CACHE.get(ch_key) or dialog_entity_index.get(ch_key)
@@ -496,6 +503,8 @@ async def _search_videos_and_texts(
                 break
             except FloodWaitError as e:
                 wait_s = int(getattr(e, "seconds", 0) or 0)
+                if wait_s > max_flood_wait_seconds:
+                    max_flood_wait_seconds = wait_s
                 if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
                     return
                 await asyncio.sleep(wait_s + 1)
@@ -534,6 +543,8 @@ async def _search_videos_and_texts(
                     break
                 except FloodWaitError as e:
                     wait_s = int(getattr(e, "seconds", 0) or 0)
+                    if wait_s > max_flood_wait_seconds:
+                        max_flood_wait_seconds = wait_s
                     if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
                         break
                     await asyncio.sleep(wait_s + 1)
@@ -552,9 +563,10 @@ async def _search_videos_and_texts(
         details = "; ".join(skipped_errors) if skipped_errors else "ошибки get_entity"
         raise RuntimeError(f"Не удалось открыть ни один канал ({skipped_channels}/{total_channels}): {details}")
     if not found and flood_skipped > 0:
+        wait_minutes = max(1, math.ceil(max_flood_wait_seconds / 60)) if max_flood_wait_seconds > 0 else 10
         raise RuntimeError(
             f"Telegram временно ограничил доступ (FloodWait) по {flood_skipped} каналам. "
-            "Подождите 10-20 минут и повторите."
+            f"Подождите примерно {wait_minutes} мин и повторите."
         )
 
     final = sorted(found.values(), key=lambda x: x[0], reverse=True)
