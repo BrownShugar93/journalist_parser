@@ -308,6 +308,8 @@ async def _search_videos_and_texts(
     found_lock = asyncio.Lock()
     done_channels = 0
     total_channels = max(1, len(channels))
+    keywords_lc = [k.lower() for k in keywords]
+    excludes_lc = [k.lower() for k in exclude_keywords]
 
     async def process_channel(client: TelegramClient, ch: str):
         nonlocal done_channels
@@ -320,38 +322,46 @@ async def _search_videos_and_texts(
                     progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — пропуск")
                 return
 
-            for kw in keywords:
-                if progress_cb:
-                    progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — «{kw}»")
+            scanned = 0
+            async for msg in client.iter_messages(entity, offset_date=end_inclusive):
+                if not msg or not msg.date:
+                    continue
 
-                async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
-                    if not msg or not msg.date:
-                        continue
+                msg_date = msg.date
+                if msg_date.tzinfo is None:
+                    msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                    msg_date = msg.date
-                    if msg_date.tzinfo is None:
-                        msg_date = msg_date.replace(tzinfo=timezone.utc)
+                if msg_date > end:
+                    continue
+                if msg_date < start:
+                    break
 
-                    if msg_date > end:
-                        continue
-                    if msg_date < start:
-                        break
+                if videos_only and (not _is_video(msg)):
+                    continue
 
-                    if videos_only and (not _is_video(msg)):
-                        continue
+                text = (msg.message or "").strip()
+                text_lc = text.lower()
 
-                    text = (msg.message or "").strip()
-                    if _text_has_excludes(text, exclude_keywords):
-                        continue
+                if keywords_lc and not any(k in text_lc for k in keywords_lc):
+                    continue
+                if excludes_lc and any(k in text_lc for k in excludes_lc):
+                    continue
 
-                    link = f"https://t.me/{ch}/{msg.id}"
-                    fp = _video_fingerprint(msg) or f"link:{link}"
-                    async with found_lock:
-                        if fp not in found:
-                            found[fp] = (msg_date, link, text)
+                link = f"https://t.me/{ch}/{msg.id}"
+                fp = _video_fingerprint(msg) or f"link:{link}"
+                async with found_lock:
+                    if fp not in found:
+                        found[fp] = (msg_date, link, text)
 
-                    if throttle > 0:
-                        await asyncio.sleep(throttle)
+                scanned += 1
+                if progress_cb and scanned % 200 == 0:
+                    progress_cb(
+                        min(0.95, (done_channels / total_channels) * 0.95),
+                        f"@{ch} — найдено: {scanned}",
+                    )
+
+                if throttle > 0:
+                    await asyncio.sleep(throttle)
 
             done_channels += 1
             if progress_cb:
