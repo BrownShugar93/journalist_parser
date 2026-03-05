@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from telethon.errors import FloodWaitError
 
 from db import (
     init_db,
@@ -34,8 +35,10 @@ MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
 THROTTLE_SECONDS = 0.0
 TEXT_DEDUP_RATIO = 0.95
-MAX_PARALLEL_CHANNELS = 4
+MAX_PARALLEL_CHANNELS = 2
 FUZZY_DEDUP_MAX_ROWS = 1500
+MAX_FLOOD_WAIT_SECONDS = 180
+MAX_FLOOD_RETRIES = 2
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -359,94 +362,153 @@ async def _search_videos_and_texts(
     async def process_channel(client: TelegramClient, ch: str):
         nonlocal done_channels, matched_total, skipped_channels
         async with sem:
-            try:
-                entity = await client.get_entity(ch)
-            except Exception as e:
-                skipped_channels += 1
-                if len(skipped_errors) < 5:
-                    skipped_errors.append(f"@{ch}: {e.__class__.__name__}")
-                if progress_cb:
-                    done_channels += 1
-                    progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — пропуск")
-                return
+            entity = None
+            for attempt in range(MAX_FLOOD_RETRIES + 1):
+                try:
+                    entity = await client.get_entity(ch)
+                    break
+                except FloodWaitError as e:
+                    wait_s = int(getattr(e, "seconds", 0) or 0)
+                    if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
+                        skipped_channels += 1
+                        if len(skipped_errors) < 5:
+                            skipped_errors.append(f"@{ch}: FloodWaitError({wait_s}s)")
+                        if progress_cb:
+                            done_channels += 1
+                            progress_cb(
+                                min(0.95, (done_channels / total_channels) * 0.95),
+                                f"@{ch} — flood wait {wait_s}s, пропуск",
+                            )
+                        return
+                    if progress_cb:
+                        progress_cb(
+                            min(0.95, (done_channels / total_channels) * 0.95),
+                            f"@{ch} — flood wait {wait_s}s, жду...",
+                        )
+                    await asyncio.sleep(wait_s + 1)
+                except Exception as e:
+                    skipped_channels += 1
+                    if len(skipped_errors) < 5:
+                        skipped_errors.append(f"@{ch}: {e.__class__.__name__}")
+                    if progress_cb:
+                        done_channels += 1
+                        progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — пропуск")
+                    return
 
             scanned = 0
-            async for msg in client.iter_messages(entity, offset_date=end_inclusive):
-                if not msg or not msg.date:
-                    continue
+            for attempt in range(MAX_FLOOD_RETRIES + 1):
+                try:
+                    async for msg in client.iter_messages(entity, offset_date=end_inclusive):
+                        if not msg or not msg.date:
+                            continue
 
-                msg_date = msg.date
-                if msg_date.tzinfo is None:
-                    msg_date = msg_date.replace(tzinfo=timezone.utc)
+                        msg_date = msg.date
+                        if msg_date.tzinfo is None:
+                            msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                if msg_date > end:
-                    continue
-                if msg_date < start:
+                        if msg_date > end:
+                            continue
+                        if msg_date < start:
+                            break
+
+                        if videos_only and (not _is_video(msg)):
+                            continue
+
+                        text = (msg.message or "").strip()
+                        if keywords_lc and not _text_has_keyword(text, keywords_lc):
+                            continue
+                        if _text_has_excludes(text, excludes_lc):
+                            continue
+
+                        link = f"https://t.me/{ch}/{msg.id}"
+                        fp = _video_fingerprint(msg) or f"link:{link}"
+                        async with found_lock:
+                            if fp not in found:
+                                found[fp] = (msg_date, link, text)
+                                matched_total += 1
+
+                        scanned += 1
+                        if progress_cb and scanned % 200 == 0:
+                            progress_cb(
+                                min(0.95, (done_channels / total_channels) * 0.95),
+                                f"@{ch} — найдено: {scanned}",
+                            )
+
+                        if throttle > 0:
+                            await asyncio.sleep(throttle)
                     break
-
-                if videos_only and (not _is_video(msg)):
-                    continue
-
-                text = (msg.message or "").strip()
-                if keywords_lc and not _text_has_keyword(text, keywords_lc):
-                    continue
-                if _text_has_excludes(text, excludes_lc):
-                    continue
-
-                link = f"https://t.me/{ch}/{msg.id}"
-                fp = _video_fingerprint(msg) or f"link:{link}"
-                async with found_lock:
-                    if fp not in found:
-                        found[fp] = (msg_date, link, text)
-                        matched_total += 1
-
-                scanned += 1
-                if progress_cb and scanned % 200 == 0:
-                    progress_cb(
-                        min(0.95, (done_channels / total_channels) * 0.95),
-                        f"@{ch} — найдено: {scanned}",
-                    )
-
-                if throttle > 0:
-                    await asyncio.sleep(throttle)
+                except FloodWaitError as e:
+                    wait_s = int(getattr(e, "seconds", 0) or 0)
+                    if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
+                        skipped_channels += 1
+                        if len(skipped_errors) < 5:
+                            skipped_errors.append(f"@{ch}: FloodWaitError({wait_s}s)")
+                        if progress_cb:
+                            progress_cb(
+                                min(0.95, (done_channels / total_channels) * 0.95),
+                                f"@{ch} — flood wait {wait_s}s, пропуск",
+                            )
+                        break
+                    if progress_cb:
+                        progress_cb(
+                            min(0.95, (done_channels / total_channels) * 0.95),
+                            f"@{ch} — flood wait {wait_s}s, жду...",
+                        )
+                    await asyncio.sleep(wait_s + 1)
 
             done_channels += 1
             if progress_cb:
                 progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — готово")
 
     async def fallback_channel_search(client: TelegramClient, ch: str):
-        try:
-            entity = await client.get_entity(ch)
-        except Exception:
-            return
+        entity = None
+        for attempt in range(MAX_FLOOD_RETRIES + 1):
+            try:
+                entity = await client.get_entity(ch)
+                break
+            except FloodWaitError as e:
+                wait_s = int(getattr(e, "seconds", 0) or 0)
+                if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
+                    return
+                await asyncio.sleep(wait_s + 1)
+            except Exception:
+                return
         for kw in keywords_lc:
-            async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
-                if not msg or not msg.date:
-                    continue
+            for attempt in range(MAX_FLOOD_RETRIES + 1):
+                try:
+                    async for msg in client.iter_messages(entity, search=kw, offset_date=end_inclusive):
+                        if not msg or not msg.date:
+                            continue
 
-                msg_date = msg.date
-                if msg_date.tzinfo is None:
-                    msg_date = msg_date.replace(tzinfo=timezone.utc)
+                        msg_date = msg.date
+                        if msg_date.tzinfo is None:
+                            msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                if msg_date > end:
-                    continue
-                if msg_date < start:
+                        if msg_date > end:
+                            continue
+                        if msg_date < start:
+                            break
+
+                        if videos_only and (not _is_video(msg)):
+                            continue
+
+                        text = (msg.message or "").strip()
+                        if _text_has_excludes(text, excludes_lc):
+                            continue
+
+                        link = f"https://t.me/{ch}/{msg.id}"
+                        fp = _video_fingerprint(msg) or f"link:{link}"
+                        async with found_lock:
+                            if fp not in found:
+                                found[fp] = (msg_date, link, text)
+                        if throttle > 0:
+                            await asyncio.sleep(throttle)
                     break
-
-                if videos_only and (not _is_video(msg)):
-                    continue
-
-                text = (msg.message or "").strip()
-                if _text_has_excludes(text, excludes_lc):
-                    continue
-
-                link = f"https://t.me/{ch}/{msg.id}"
-                fp = _video_fingerprint(msg) or f"link:{link}"
-                async with found_lock:
-                    if fp not in found:
-                        found[fp] = (msg_date, link, text)
-                if throttle > 0:
-                    await asyncio.sleep(throttle)
+                except FloodWaitError as e:
+                    wait_s = int(getattr(e, "seconds", 0) or 0)
+                    if wait_s <= 0 or wait_s > MAX_FLOOD_WAIT_SECONDS or attempt >= MAX_FLOOD_RETRIES:
+                        break
+                    await asyncio.sleep(wait_s + 1)
 
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
         if not await client.is_user_authorized():
