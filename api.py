@@ -310,13 +310,19 @@ async def _search_videos_and_texts(
     total_channels = max(1, len(channels))
     keywords_lc = [k.lower() for k in keywords]
     excludes_lc = [k.lower() for k in exclude_keywords]
+    scanned_total = 0
+    skipped_channels = 0
+    skipped_errors: List[str] = []
 
     async def process_channel(client: TelegramClient, ch: str):
-        nonlocal done_channels
+        nonlocal done_channels, scanned_total, skipped_channels
         async with sem:
             try:
                 entity = await client.get_entity(ch)
-            except Exception:
+            except Exception as e:
+                skipped_channels += 1
+                if len(skipped_errors) < 5:
+                    skipped_errors.append(f"@{ch}: {e.__class__.__name__}")
                 if progress_cb:
                     done_channels += 1
                     progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — пропуск")
@@ -352,6 +358,7 @@ async def _search_videos_and_texts(
                 async with found_lock:
                     if fp not in found:
                         found[fp] = (msg_date, link, text)
+                scanned_total += 1
 
                 scanned += 1
                 if progress_cb and scanned % 200 == 0:
@@ -368,12 +375,18 @@ async def _search_videos_and_texts(
                 progress_cb(min(0.95, (done_channels / total_channels) * 0.95), f"@{ch} — готово")
 
     async with TelegramClient(session, int(API_ID), API_HASH) as client:
+        if not await client.is_user_authorized():
+            raise RuntimeError("Telegram-сессия не авторизована. Обновите TG_STRING_SESSION или сессию.")
         await asyncio.gather(*(process_channel(client, ch) for ch in channels))
+
+    if skipped_channels >= total_channels:
+        details = "; ".join(skipped_errors) if skipped_errors else "ошибки get_entity"
+        raise RuntimeError(f"Не удалось открыть ни один канал ({skipped_channels}/{total_channels}): {details}")
 
     final = sorted(found.values(), key=lambda x: x[0], reverse=True)
     rows = [(dt.isoformat(), link, text) for dt, link, text in final]
     if progress_cb:
-        progress_cb(0.95, "Дедуп по тексту...")
+        progress_cb(0.95, f"Дедуп по тексту... найдено: {len(rows)}, пропусков каналов: {skipped_channels}")
     rows = _dedup_by_text(rows, progress_cb=progress_cb)
     links_only = [link for _, link, _ in rows]
     if progress_cb:
