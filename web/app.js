@@ -312,6 +312,7 @@ const channelLists = {
     'https://t.me/glavpolit',
     'https://t.me/master_pera',
     'https://t.me/madam_secretar',
+    'https://t.me/badphrase',
   ],
   custom: [],
 };
