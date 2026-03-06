@@ -127,6 +127,11 @@ def _cleanup_jobs():
         if now - created > JOB_TTL_SECONDS:
             expired.append(job_id)
     for job_id in expired:
+        job = JOBS.get(job_id)
+        if job:
+            task = job.get("task")
+            if task and hasattr(task, "done") and not task.done():
+                task.cancel()
         JOBS.pop(job_id, None)
 
     if len(JOBS) > JOB_MAX_ITEMS:
@@ -136,6 +141,11 @@ def _cleanup_jobs():
             key=lambda kv: float(kv[1].get("created_at", now)),
         )
         for job_id, _ in sorted_jobs[: max(0, len(JOBS) - JOB_MAX_ITEMS)]:
+            job = JOBS.get(job_id)
+            if job:
+                task = job.get("task")
+                if task and hasattr(task, "done") and not task.done():
+                    task.cancel()
             JOBS.pop(job_id, None)
 
 
@@ -654,6 +664,10 @@ async def _run_job(job_id: str, req: SearchRequest):
         job["log"] = msg
 
     try:
+        job = JOBS.get(job_id)
+        if job:
+            job["progress"] = 1.0
+            job["log"] = "Инициализация..."
         channels = _normalize_channels(req.channels)
         keywords = _normalize_keywords(req.keywords)
         excludes = _normalize_exclude(req.exclude_keywords)
@@ -690,6 +704,10 @@ async def _run_job(job_id: str, req: SearchRequest):
         if job:
             job["done"] = True
             job["error"] = str(e)
+    finally:
+        job = JOBS.get(job_id)
+        if job:
+            job["task"] = None
 
 
 @app.post("/search/start", response_model=StartSearchResponse)
@@ -726,9 +744,11 @@ async def start_search(req: SearchRequest):
         "user_id": int(user["id"]),
         "today_str": today_str,
         "created_at": datetime.now(timezone.utc).timestamp(),
+        "task": None,
     }
     req.exclude_keywords = excludes
-    asyncio.create_task(_run_job(job_id, req))
+    task = asyncio.create_task(_run_job(job_id, req))
+    JOBS[job_id]["task"] = task
     return StartSearchResponse(job_id=job_id)
 
 
