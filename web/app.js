@@ -35,7 +35,6 @@ const store = {
 };
 
 let activeRunSeq = 0;
-const MAX_STATUS_WAIT_MS = Infinity;
 
 const channelLists = {
   voenkory: [
@@ -456,14 +455,10 @@ els.runBtn.addEventListener('click', async () => {
     const { job_id } = await startRes.json();
     if (!job_id) throw new Error('Не получил job_id');
 
-    const startedAt = Date.now();
     let done = false;
     while (!done) {
       if (runSeq !== activeRunSeq) {
         throw new Error('Запуск отменён новым запросом');
-      }
-      if (Date.now() - startedAt > MAX_STATUS_WAIT_MS) {
-        throw new Error('Таймаут ожидания результата. Повтори запуск.');
       }
       const st = await apiFetch(`/search/status/${job_id}`);
       if (st.status !== 200) {
