@@ -41,6 +41,7 @@ FUZZY_DEDUP_MAX_ROWS = 1500
 MAX_FLOOD_WAIT_SECONDS = 180
 MAX_FLOOD_RETRIES = 2
 BATCH_SIZE = 20
+CHANNEL_MAX_SECONDS = 120
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -397,12 +398,18 @@ async def _search_videos_and_texts(
             entity = None
             ch_key = ch.lower()
             entity = ENTITY_CACHE.get(ch_key) or dialog_entity_index.get(ch_key)
+            start_ts = asyncio.get_event_loop().time()
             for attempt in range(MAX_FLOOD_RETRIES + 1):
                 if entity is not None:
                     break
                 try:
                     entity = await client.get_entity(ch)
                     ENTITY_CACHE[ch_key] = entity
+                    if progress_cb:
+                        progress_cb(
+                            min(0.95, (done_channels / total_channels) * 0.95),
+                            f"@{ch} — подключено",
+                        )
                     break
                 except FloodWaitError as e:
                     wait_s = int(getattr(e, "seconds", 0) or 0)
@@ -439,6 +446,14 @@ async def _search_videos_and_texts(
             for attempt in range(MAX_FLOOD_RETRIES + 1):
                 try:
                     async for msg in client.iter_messages(entity, offset_date=end_inclusive):
+                        if asyncio.get_event_loop().time() - start_ts > CHANNEL_MAX_SECONDS:
+                            if progress_cb:
+                                progress_cb(
+                                    min(0.95, (done_channels / total_channels) * 0.95),
+                                    f"@{ch} — таймаут, пропуск",
+                                )
+                            skipped_channels += 1
+                            return
                         if not msg or not msg.date:
                             continue
 
@@ -574,6 +589,11 @@ async def _search_videos_and_texts(
                     f"Пакет {idx}/{total_batches} — старт",
                 )
             await asyncio.gather(*(process_channel(client, ch) for ch in batch))
+            if progress_cb:
+                progress_cb(
+                    min(0.95, (done_channels / total_channels) * 0.95),
+                    f"Пакет {idx}/{total_batches} — завершён",
+                )
         if not found:
             if progress_cb:
                 progress_cb(0.6, "Первый проход пустой, пробую fallback-поиск...")
