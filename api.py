@@ -34,14 +34,13 @@ CHANNEL_RE = re.compile(
 MAX_CHANNELS = 100
 MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
-THROTTLE_SECONDS = 0.01
+THROTTLE_SECONDS = 0.0
 TEXT_DEDUP_RATIO = 0.95
-MAX_PARALLEL_CHANNELS = 2
+MAX_PARALLEL_CHANNELS = 4
 FUZZY_DEDUP_MAX_ROWS = 1500
 MAX_FLOOD_WAIT_SECONDS = 180
 MAX_FLOOD_RETRIES = 2
-BATCH_SIZE = 20
-CHANNEL_MAX_SECONDS = 120
+BATCH_SIZE = 50
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -398,7 +397,6 @@ async def _search_videos_and_texts(
             entity = None
             ch_key = ch.lower()
             entity = ENTITY_CACHE.get(ch_key) or dialog_entity_index.get(ch_key)
-            start_ts = asyncio.get_event_loop().time()
             for attempt in range(MAX_FLOOD_RETRIES + 1):
                 if entity is not None:
                     break
@@ -446,14 +444,6 @@ async def _search_videos_and_texts(
             for attempt in range(MAX_FLOOD_RETRIES + 1):
                 try:
                     async for msg in client.iter_messages(entity, offset_date=end_inclusive):
-                        if asyncio.get_event_loop().time() - start_ts > CHANNEL_MAX_SECONDS:
-                            if progress_cb:
-                                progress_cb(
-                                    min(0.95, (done_channels / total_channels) * 0.95),
-                                    f"@{ch} — таймаут, пропуск",
-                                )
-                            skipped_channels += 1
-                            return
                         if not msg or not msg.date:
                             continue
 

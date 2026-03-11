@@ -35,7 +35,7 @@ const store = {
 };
 
 let activeRunSeq = 0;
-const MAX_STATUS_WAIT_MS = 12 * 60 * 1000;
+const MAX_STATUS_WAIT_MS = Infinity;
 
 const channelLists = {
   voenkory: [
@@ -91,6 +91,7 @@ const channelLists = {
     'https://t.me/proofzzz',
     'https://t.me/vkpelmen',
     'https://t.me/oreshnik_group1',
+    'https://t.me/rucriminalinfo_2',
   ],
   news: [
     'https://t.me/rian_ru',
@@ -322,6 +323,7 @@ const channelLists = {
     'https://t.me/master_pera',
     'https://t.me/madam_secretar',
     'https://t.me/badphrase',
+    'https://t.me/rucriminalinfo_2',
   ],
   custom: [],
 };
