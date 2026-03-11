@@ -34,12 +34,13 @@ CHANNEL_RE = re.compile(
 MAX_CHANNELS = 100
 MAX_DAYS_WINDOW = 0
 MAX_DAILY_RUNS = 20
-THROTTLE_SECONDS = 0.03
+THROTTLE_SECONDS = 0.01
 TEXT_DEDUP_RATIO = 0.95
-MAX_PARALLEL_CHANNELS = 1
+MAX_PARALLEL_CHANNELS = 2
 FUZZY_DEDUP_MAX_ROWS = 1500
 MAX_FLOOD_WAIT_SECONDS = 180
 MAX_FLOOD_RETRIES = 2
+BATCH_SIZE = 20
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -375,10 +376,12 @@ async def _search_videos_and_texts(
         session = StringSession(string_session)
     else:
         session = SESSION_NAME
-    sem = asyncio.Semaphore(max(1, min(MAX_PARALLEL_CHANNELS, len(channels) or 1)))
+    sem = asyncio.Semaphore(1)
     found_lock = asyncio.Lock()
     done_channels = 0
     total_channels = max(1, len(channels))
+    batches = [channels[i : i + BATCH_SIZE] for i in range(0, len(channels), BATCH_SIZE)]
+    total_batches = max(1, len(batches))
     keywords_lc = [k.lower() for k in keywords]
     excludes_lc = [k.lower() for k in exclude_keywords]
     matched_total = 0
@@ -563,11 +566,25 @@ async def _search_videos_and_texts(
         if not await client.is_user_authorized():
             raise RuntimeError("Telegram-сессия не авторизована. Обновите TG_STRING_SESSION или сессию.")
         dialog_entity_index = await _build_dialog_entity_index(client)
-        await asyncio.gather(*(process_channel(client, ch) for ch in channels))
+        for idx, batch in enumerate(batches, start=1):
+            sem = asyncio.Semaphore(max(1, min(MAX_PARALLEL_CHANNELS, len(batch) or 1)))
+            if progress_cb:
+                progress_cb(
+                    min(0.95, (done_channels / total_channels) * 0.95),
+                    f"Пакет {idx}/{total_batches} — старт",
+                )
+            await asyncio.gather(*(process_channel(client, ch) for ch in batch))
         if not found:
             if progress_cb:
                 progress_cb(0.6, "Первый проход пустой, пробую fallback-поиск...")
-            await asyncio.gather(*(fallback_channel_search(client, ch) for ch in channels))
+            for idx, batch in enumerate(batches, start=1):
+                sem = asyncio.Semaphore(max(1, min(MAX_PARALLEL_CHANNELS, len(batch) or 1)))
+                if progress_cb:
+                    progress_cb(
+                        min(0.95, (done_channels / total_channels) * 0.95),
+                        f"Fallback пакет {idx}/{total_batches} — старт",
+                    )
+                await asyncio.gather(*(fallback_channel_search(client, ch) for ch in batch))
 
     if skipped_channels >= total_channels:
         details = "; ".join(skipped_errors) if skipped_errors else "ошибки get_entity"
